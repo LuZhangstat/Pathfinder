@@ -17,7 +17,8 @@ warmup = function(file,
   num_params = get_num_upars(stan_fit)
 
   fit = NULL
-  usamples = array(0, dim = c(window_size * max_num_windows, num_chains, num_params))
+  usamples = array(0, dim = c(window_size * max_num_windows, num_chains,
+                              num_params))
   stepsizes = NULL
   inv_metric = NULL
   window_end = NULL
@@ -27,7 +28,7 @@ warmup = function(file,
     window_end = window * window_size
 
     fargs = args
-    fargs$num_chains = num_chains
+    fargs$chains = num_chains
     fargs$save_warmup = 1
     fargs$num_warmup = window_size
     fargs$num_sample = 0
@@ -39,7 +40,9 @@ warmup = function(file,
       fargs$window = 0
     } else {
       fargs$inv_metric = inv_metric
-      fargs$init = sapply(1:num_chains, function(chain) { getInitFile(stan_fit, usamples[window_start - 1, chain,]) })
+      fargs$init =
+        sapply(1:num_chains, function(chain) {
+          getInitFile(stan_fit, usamples[window_start - 1, chain,]) })
       fargs$stepsize = mean(stepsizes)
       fargs$init_buffer = 0
       fargs$window = window_size + 1
@@ -56,7 +59,8 @@ warmup = function(file,
       getUnconstrainedSamples(fit)
     stepsizes = getStepsizes(fit)
 
-    nleapfrogs = nleapfrogs + sum(sapply(getExtras(fit), function(df) { sum(df %>% pull(n_leapfrog__)) }))
+    nleapfrogs = nleapfrogs +
+      sum(sapply(getExtras(fit), function(df) { sum(df %>% pull(n_leapfrog__)) }))
 
     results = compute_window_convergence(usamples[1:window_end,,], window_size, target_rhat, target_ess)
 
@@ -69,7 +73,7 @@ warmup = function(file,
   }
 
   fargs = args
-  fargs$num_chains = num_chains
+  fargs$chains = num_chains
   fargs$num_warmup = 50
   fargs$metric = "dense_e"
   fargs$init = sapply(1:num_chains, function(chain) { getInitFile(stan_fit, usamples[window_end, chain,]) })
