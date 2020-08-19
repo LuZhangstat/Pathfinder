@@ -10,6 +10,7 @@ po
 
 # access data and model
 sc <- stan_code(po)
+sc
 dat <- get_data(po)
 
 # Access gold standard posterior draws and information on how those were computed as follows.
@@ -19,26 +20,17 @@ gsd <- reference_posterior_draws(po)
 draws_df <- posterior::as_draws_df(gsd)
 head(draws_df)
 
-### obtain the optimization path ###
+### test Bob's code ###
 #library(cmdstanr)
 library(rstan)
 #library(posterior)
 #library(bayesplot) # draw dis
 set.seed(123)
 m <- stan_model(model_code = sc)
-f <- optimizing(m, data = list(N = dat$N, x = dat$x, y = dat$y),
-                verbose = TRUE, iter = 2000, save_iterations = TRUE,
-                refresh = 1, sample_file = "./optim_trace")
-# file <- file.path("./stat_comp_benchmarks/benchmarks/gp_regr/gp_regr.stan")
-# mod <-  cmdstan_model(file)
-# check the optimization algorithm:
-# fit_mle <- mod$optimize(data = list(N = dat$N, x = dat$x, y = dat$y), 
-#                         seed = 123,
-#                         save_latent_dynamics = TRUE,
-#                         refresh = 1,
-#                         output_dir = "./")
-# the exact value of parameters are rho = 5.5, alpha = 3, sigma = 2
 
+opath <- opt_path_stan(m, data = list(N = dat$N, x = dat$x, y = dat$y), 
+                       N = 75, init_bound = 5)
+find_typical(m, data = list(N = dat$N, x = dat$x, y = dat$y), opath)
 
 
 
