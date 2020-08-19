@@ -29,6 +29,14 @@ rp_info
 gsd <- reference_posterior_draws(po)
 gsd
 
-# Error
-# draws_df <- posterior::as_draws_df(gsd$draws)
-# head(draws_df)
+posterior::summarize_draws(gsd)
+
+### obtain the histogram of lp__ ##
+library(rstan)
+source("./sim.R")
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+INV <- lp_Int_q_posteriordb(po, alpha = 0.01)
+INV
+#    0.5%        99.5% 
+#   -149854.7079 -227.5184
