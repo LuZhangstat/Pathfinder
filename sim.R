@@ -174,9 +174,13 @@ lp_recover <- function(model, data, pos_draws){
   ###
   
   posterior <- to_posterior(model, data)
-  fn <- function(theta) log_prob(posterior, theta)
+  fn <- function(theta){
+    upar = unconstrain_pars(posterior, theta)
+    names(upar) = names(theta)
+    log_prob(posterior, upar, adjust_transform = FALSE)
+  }
   lpn <- function(gsd_l) apply(sapply(gsd_l, unlist), 1, fn)
   sapply(pos_draws, lpn)
 }
 
-
+tt <- sapply(gsd[[1]], unlist)

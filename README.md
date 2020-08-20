@@ -5,7 +5,7 @@
 2) (done) test stat_comp_benchmarks
 3) (done) access posterior samples in better form in posteriordb
 4) (ask Ben) test campfire
-5) check Bob's new example
+5) (done) check Bob's new example
 6) modify campfire to give new adaptation algorithm
 7) Write a case study for the algorithm 
 Compare the Stan default NUTS with the new adaptive algorithm 
