@@ -175,12 +175,37 @@ lp_recover <- function(model, data, pos_draws){
   
   posterior <- to_posterior(model, data)
   fn <- function(theta){
-    upar = unconstrain_pars(posterior, theta)
-    names(upar) = names(theta)
-    log_prob(posterior, upar, adjust_transform = FALSE)
+    log_prob(posterior, unconstrain_pars(posterior, theta), 
+             adjust_transform = TRUE)
   }
   lpn <- function(gsd_l) apply(sapply(gsd_l, unlist), 1, fn)
   sapply(pos_draws, lpn)
 }
 
 tt <- sapply(gsd[[1]], unlist)
+
+fn <- function(theta){
+  log_prob(posterior, unconstrain_pars(posterior, theta), 
+           adjust_transform = TRUE)
+}
+fn2 <- function(theta){
+  log_prob(posterior, unconstrain_pars(posterior, theta), 
+           adjust_transform = FALSE)
+}
+theta1 <- c(6.0, 1.4, 1.3); names(theta1) <- c("rho", "alpha", "sigma")
+fn(theta1)
+fn2(theta1)
+
+
+
+gn <- function(theta){
+  grad_log_prob(posterior, unconstrain_pars(posterior, theta), 
+           adjust_transform = TRUE)
+}
+gn2 <- function(theta){
+  grad_log_prob(posterior, unconstrain_pars(posterior, theta), 
+           adjust_transform = FALSE)
+}
+gn(theta1)
+gn2(theta1)
+        
