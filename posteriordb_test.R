@@ -31,38 +31,63 @@ gsd
 
 posterior::summarize_draws(gsd)
 
-### obtain the histogram of lp__ ##
+### obtain the posterior interval of lp__ ##
 library(rstan)
 source("./sim.R")
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 
-m <- stan_model(model_code = sc)
-INV <- lp_Int_q_posteriordb(po, alpha = 0.01)
+model <- stan_model(model_code = sc)
+#lps <- lp_recover(model, data = dat, pos_draws = gsd)
+alpha = 0.01
+INV <- lp_Int_q_posteriordb(po, alpha)
 INV
-#    0.5%        99.5% 
-#   -33.84823    -27.63794
+# 0.5%       99.5% 
+# -1.081514  5.128775
 
 ###  run Stan with a long Phase I warmup time  ###
 set.seed(123)
 L = 2000
-phI_sample <- sampling(m, data = get_data(po), 
+M = 4
+mc.cores = 4
+phI_sample <- sampling(model, data = get_data(po), 
                        seed = 1234,
                        iter = L + 1, 
                        warmup = L,
-                       chains = 4, 
-                       cores = 4,
+                       chains = M, 
+                       cores = mc.cores,
                        algorithm ="NUTS",
                        control = list(adapt_init_buffer = L,
                                       adapt_term_buffer = 0,
                                       adapt_window = 0),
                        save_warmup = TRUE)
 
-###  record the number of iterations required to find an lp__ value  ###
-list_of_draws <- extract(phI_sample)
-str(list_of_draws)
-summary(list_of_draws$lp__)
-summary(list_of_draws$rho)
-summary(list_of_draws$alpha)
-summary(list_of_draws$sigma)
+###  record the number of iterations required to reach INV ###
+ls_lp_phI <- function(phiI_sample, L){
+  # retrieve all posterior samples of lp__ 
+  
+  f <- function(phI_sam){phI_sam$lp__[1:L]}
+  sapply(phI_sample@sim$samples, f)
+}
+lp_phI <- ls_lp_phI(phiI_sample, L)
+summary(lp_phI)
 
+# check the trace plot of lp__ #
+L_p = 20
+p_lp_trace = data.frame(iter = rep(1:L_p, M), 
+                        chain = rep(paste(1:M), each = L_p),
+                  lp__ = c(lp_phI[1:L_p, ]))
+library(ggplot2)
+p_lp <- ggplot(data = p_lp_trace, 
+               aes(x=iter, y=lp__, group=chain, color=chain)) + geom_line() +
+  geom_hline(yintercept = INV)
+p_lp
+
+# Get the number #
+lp_in_INV <- (lp_phI > INV[1] & lp_phI < INV[2])
+which(lp_in_INV == TRUE)[1]
+
+# Get the nleapfrog 
+sampler_params <- get_sampler_params(phI_sample)
+nleapfrog <- sampler_params[[1]][, "n_leapfrog__"]
+nleapfrog[1:10]
