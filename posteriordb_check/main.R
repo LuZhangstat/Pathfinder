@@ -1,4 +1,5 @@
 rm(list = ls())
+setwd("./posteriordb") # set working dir to cloned package
 library(rstan)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
@@ -8,11 +9,11 @@ rstan_options(auto_write = TRUE)
 library(posteriordb)
 library(posterior)
 library(ggplot2)
-source("./utils/sim.R")
-source("./utils/lp_utils.R")
+source("../utils/sim.R")
+source("../utils/lp_utils.R")
 
 set.seed(123)
-pd <- pdb_default() # Posterior database connection
+pd <- pdb_local() # Posterior database connection
 pn <- posterior_names(pd)
 L_pn = length(pn)
 
@@ -36,7 +37,13 @@ for(l in 1:L_pn){
   # pick model
   po <- posterior(modelname, pdb = pd)
   # get reference posterior samples
-  gsd <- reference_posterior_draws(po)
+  skip_to_next <- FALSE
+  tryCatch(gsd <- reference_posterior_draws(po), 
+           error = function(e) { skip_to_next <<- TRUE})
+  if(skip_to_next) { 
+    print("Error in obtaining reference posterior for this posterior.")
+    next }  
+  
   # compile the model
   sc <- stan_code(po)
   model <- stan_model(model_code = sc)
@@ -78,32 +85,28 @@ for(l in 1:L_pn){
   p_lp <- ggplot(data = p_lp_trace, 
                  aes(x=iter, y=lp__, group=chain, color=chain)) + geom_line() +
     geom_hline(yintercept = INV)
-  jpeg(filename = paste0("./pics/No",l,"-", modelname, ".jpeg"),
+  jpeg(filename = paste0("../pics/No",l,"-", modelname, ".jpeg"),
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
 }
 
-save(file = "./results/lp_posteriordb_explore.RData", 
+save(file = "../results/lp_posteriordb_explore.RData", 
      list = c("lp_explore_n_iters", "lp_explore_n_leapfrog",
               "lp_INV"))
 
-# check reference posterior
-for(l in 1:L_pn){
-  modelname <- pn[l]
-  printf("model %d: %s", l, modelname)
-  
-  skip_to_next <- FALSE
-  # pick model
-  tryCatch(po <- posterior(modelname, pdb = pd), 
-           error = function(e) { skip_to_next <<- TRUE})
-  if(skip_to_next) { 
-    print("Error in obtaining model info.")
-    next }  
-  # get reference posterior samples
-  tryCatch(gsd <- reference_posterior_draws(po), 
-           error = function(e) { skip_to_next <<- TRUE})
-  if(skip_to_next) { 
-    print("Error in obtaining reference posterior for this posterior.")
-    next }  
-}
+# # check reference posterior
+# for(l in 1:L_pn){
+#   modelname <- pn[l]
+#   printf("model %d: %s", l, modelname)
+#   
+#   # pick model
+#   po <- posterior(modelname, pdb = pd)
+#   # get reference posterior samples
+#   skip_to_next <- FALSE
+#   tryCatch(gsd <- reference_posterior_draws(po), 
+#            error = function(e) { skip_to_next <<- TRUE})
+#   if(skip_to_next) { 
+#     print("Error in obtaining reference posterior for this posterior.")
+#     next }  
+# }
