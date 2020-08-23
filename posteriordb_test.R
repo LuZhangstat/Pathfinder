@@ -33,7 +33,8 @@ posterior::summarize_draws(gsd)
 
 ### obtain the posterior interval of lp__ ##
 library(rstan)
-source("./sim.R")
+source("./utils/sim.R")
+source("./utils/lp_utils.R")
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 
@@ -48,8 +49,8 @@ INV
 ###  run Stan with a long Phase I warmup time  ###
 set.seed(123)
 L = 2000
-M = 4
-mc.cores = 4
+M = 12
+mc.cores = 2
 phI_sample <- sampling(model, data = get_data(po), 
                        seed = 1234,
                        iter = L + 1, 
@@ -63,12 +64,6 @@ phI_sample <- sampling(model, data = get_data(po),
                        save_warmup = TRUE)
 
 ###  record the number of iterations required to reach INV ###
-ls_lp_phI <- function(phiI_sample, L){
-  # retrieve all posterior samples of lp__ 
-  
-  f <- function(phI_sam){phI_sam$lp__[1:L]}
-  sapply(phI_sample@sim$samples, f)
-}
 lp_phI <- ls_lp_phI(phiI_sample, L)
 summary(lp_phI)
 
@@ -83,11 +78,9 @@ p_lp <- ggplot(data = p_lp_trace,
   geom_hline(yintercept = INV)
 p_lp
 
-# Get the number #
-lp_in_INV <- (lp_phI > INV[1] & lp_phI < INV[2])
-which(lp_in_INV == TRUE)[1]
+# Get the number of iterations and  leapfrogs #
+lp_explore_sum <- lp_explore(phiI_sample, INV, L, M)
+mean(lp_explore_sum$n_sum_leapfrog); max(lp_explore_sum$n_sum_leapfrog)
 
-# Get the nleapfrog 
-sampler_params <- get_sampler_params(phI_sample)
-nleapfrog <- sampler_params[[1]][, "n_leapfrog__"]
-nleapfrog[1:10]
+
+
