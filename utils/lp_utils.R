@@ -50,7 +50,7 @@ ls_lp_phI <- function(phiI_sample, L){
   ###
   
   f <- function(phI_sam){phI_sam$lp__[1:L]}
-  sapply(phI_sample@sim$samples, f)
+  sapply(phiI_sample@sim$samples, f)
   
 }
 
@@ -60,9 +60,13 @@ lp_explore <- function(phiI_sample, INV, L, M){
   lp_phI <- ls_lp_phI(phiI_sample, L)
   lp_in_INV <- (lp_phI >= INV[1] & lp_phI <= INV[2])
   n_iters <- apply(lp_in_INV, 2, f <- function(x){which(x == TRUE)[1]})
+  if(sum(is.na(n_iters)) > 0){
+    print("not all chains reach the target region")
+    n_iters[is.na(n_iters)] <- L
+  }
   
   # get corresponding sum of leapfrog numbers
-  sampler_params <- get_sampler_params(phI_sample)
+  sampler_params <- get_sampler_params(phiI_sample)
   n_sum_leapfrog <- 
     sapply(1:M, g <- function(x){
       sum(sampler_params[[x]][1:n_iters[x], "n_leapfrog__"])})
