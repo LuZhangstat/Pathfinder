@@ -25,8 +25,17 @@ lp_recover <- function(model, data, pos_draws){
   ###
   
   posterior <- to_posterior(model, data)
+  par_template <- get_inits(posterior)[[1]]  # get random inits
+  npar <- length(par_template)              # number of pars
+  n_inits <- sapply(par_template, length)
+  
   fn <- function(theta){
-    log_prob(posterior, unconstrain_pars(posterior, theta), 
+    j = 1
+    for(i in 1:npar){
+      par_template[[i]] <- theta[j:(j + n_inits[i] - 1)]
+      j = j + n_inits[i]
+    }
+    log_prob(posterior, unconstrain_pars(posterior, par_template), 
              adjust_transform = TRUE, gradient = TRUE)[1]
   }
   lpn <- function(gsd_l) apply(sapply(gsd_l, unlist), 1, fn)
@@ -49,7 +58,7 @@ lp_explore <- function(phiI_sample, INV, L, M){
   
   # get number of iterations for lp__ to reach INV
   lp_phI <- ls_lp_phI(phiI_sample, L)
-  lp_in_INV <- (lp_phI > INV[1] & lp_phI < INV[2])
+  lp_in_INV <- (lp_phI >= INV[1] & lp_phI <= INV[2])
   n_iters <- apply(lp_in_INV, 2, f <- function(x){which(x == TRUE)[1]})
   
   # get corresponding sum of leapfrog numbers
