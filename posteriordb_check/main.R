@@ -90,10 +90,11 @@ for(l in 1:L_pn){
   dev.off()
 }
 
-save(file = "../results/lp_posteriordb_explore.RData", 
-     list = c("lp_explore_n_iters", "lp_explore_n_leapfrog",
-              "lp_INV"))
-
+# save(file = "../results/lp_posteriordb_explore.RData", 
+#      list = c("lp_explore_n_iters", "lp_explore_n_leapfrog",
+#               "lp_INV"))
+# 
+# load("../results/lp_posteriordb_explore.RData")
 ## check reference posterior ##
 N_models = 0
 for(l in 1:L_pn){
@@ -154,5 +155,20 @@ sum((lp_explore_n_leapfrog <= 3e4), na.rm = TRUE) /
 #' The 3th, 9th, 10th, 14th, 24th, 27th and 37th model have phase I MCMC chains
 #' fail to reach the target interval within 30,000 leapfrogs
 table(as.integer(which(lp_explore_n_leapfrog > 3e4) / M - 0.5 / M) + 1)
+# 3  9 10 14 24 27 37 
+# 1 20  1  2 20  1  6
 
 #' In summary, the current Stan algorithm for phase I is slow for model 9 and 24
+
+#' After checking model 9 and 24, I found that the lp__ posterior interval based
+#' on the reference posterior samples seems to be uncorrect. See, e.g. 
+#' No9-earnings-earn_height_2.jpeg. One chain for model 27 got stuck, 
+#' (see No27-hudson_lynx_hare-lotka_volterra.jpeg), but the remaining chains 
+#' are fine,(see No27-hudson_lynx_hare-lotka_volterra_no6.jpeg). 
+#' Similar for model 40 and 41. After taking off model 9 and 24 and chain 
+#' with problem, the hist of sum_leapfrog is:
+
+
+
+
+ 
