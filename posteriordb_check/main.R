@@ -21,7 +21,6 @@ L_pn = length(pn)
 alpha = 0.01
 L = 1000
 M = 20
-L_p = 50
 width = 860; height = 740 # the size of the plot
 mc.cores = parallel::detectCores() - 2
 sample_seed = 1234
