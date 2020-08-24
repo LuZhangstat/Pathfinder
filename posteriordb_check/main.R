@@ -94,18 +94,65 @@ save(file = "../results/lp_posteriordb_explore.RData",
      list = c("lp_explore_n_iters", "lp_explore_n_leapfrog",
               "lp_INV"))
 
-# # check reference posterior
-# for(l in 1:L_pn){
-#   modelname <- pn[l]
-#   printf("model %d: %s", l, modelname)
-#   
-#   # pick model
-#   po <- posterior(modelname, pdb = pd)
-#   # get reference posterior samples
-#   skip_to_next <- FALSE
-#   tryCatch(gsd <- reference_posterior_draws(po), 
-#            error = function(e) { skip_to_next <<- TRUE})
-#   if(skip_to_next) { 
-#     print("Error in obtaining reference posterior for this posterior.")
-#     next }  
-# }
+## check reference posterior ##
+N_models = 0
+for(l in 1:L_pn){
+  modelname <- pn[l]
+  # printf("model %d: %s", l, modelname)
+
+  # pick model
+  po <- posterior(modelname, pdb = pd)
+  # get reference posterior samples
+  skip_to_next <- FALSE
+  tryCatch(gsd <- reference_posterior_draws(po),
+           error = function(e) { skip_to_next <<- TRUE})
+  if(skip_to_next) {
+    # print("Error in obtaining reference posterior for this posterior.")
+    next }
+  N_models = N_models + 1
+}
+N_models
+# only 49 out of 97 models have reference posterior samples
+
+## check the distribution of number of iterations ##
+n_iters_mean <- colMeans(lp_explore_n_iters)
+mean(n_iters_mean, na.rm = TRUE) #86.74592
+sd(n_iters_mean, na.rm = TRUE)   #194.8229
+hist(lp_explore_n_iters, breaks = 100, 
+     main = "No. iters to reach target interval",
+     xlab = "No. iters")
+
+#' Around 94% of phase I MCMC chains reach the target interval within 200 '
+#' iterations. 
+sum((lp_explore_n_iters <= 200), na.rm = TRUE) / 
+  sum(!is.na(lp_explore_n_iters))
+
+#' The 9th, 24th, 27th, 40th and 41th model have phase I MCMC chains
+#' fail to reach the target interval within 1000 iters
+table(as.integer(which(lp_explore_n_iters == L) / M - 0.5 / M) + 1)
+# 9 24 27 40 41 
+# 20 20  1  1  1 
+
+## check the distribution of sum of leapfrogs ##
+n_leapfrog_mean <- colMeans(lp_explore_n_leapfrog)
+mean(n_leapfrog_mean, na.rm = TRUE) #21602.9
+sd(n_leapfrog_mean, na.rm = TRUE)   #96441.13
+hist(lp_explore_n_leapfrog, breaks = 200, 
+     main = "No. iters to reach target interval",
+     xlab = "No. iters")
+
+#' Around 66% of phase I MCMC chains spend less than 2000
+#' leapfrogs for lp__ to reach the 99% posterior interval
+sum((lp_explore_n_leapfrog <= 2000), na.rm = TRUE) / 
+  sum(!is.na(lp_explore_n_leapfrog))
+
+#' Around 94.8% of phase I MCMC chains spend less than 30,000
+#' leapfrogs for lp__ to reach the 99% posterior interval
+sum((lp_explore_n_leapfrog <= 3e4), na.rm = TRUE) / 
+  sum(!is.na(lp_explore_n_leapfrog))
+
+#' The 3th, 9th, 10th, 14th, 24th, 27th and 37th model have phase I MCMC chains
+#' fail to reach the target interval within 30,000 leapfrogs
+table(as.integer(which(lp_explore_n_leapfrog > 3e4) / M - 0.5 / M) + 1)
+
+#' In summary, the current Stan algorithm for phase I is slow for model 9 and 24
