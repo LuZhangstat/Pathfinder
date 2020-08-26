@@ -46,8 +46,7 @@ for(l in 1:L_pn){
 N_models
 
 df <- data.frame(n_iters = c(lp_explore_n_iters[, model_record]), 
-                 n_leapfrogs = 
-                   c(lp_explore_n_leapfrog[, model_record]),
+                 n_leapfrogs = c(lp_explore_n_leapfrog[, model_record]),
                  model = rep(pn[model_record], each = M))
 
 jpeg(filename = paste0("../pics/box_iters_log.jpeg"),
