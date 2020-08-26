@@ -185,6 +185,7 @@ p_leapfrog <- ggplot(data =df , aes(x = sum_leapfrog)) +
 print(p_leapfrog)
 dev.off()
 
+
 #' Around 80.1% of phase I MCMC chains spend less than 4000
 #' leapfrogs for lp__ to reach the 99% posterior interval.
 sum((lp_explore_n_leapfrog[, -takeoff] <= 4000), na.rm = TRUE) / 
