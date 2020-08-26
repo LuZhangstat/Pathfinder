@@ -117,9 +117,9 @@ for(l in 1:L_pn){
 N_models
 # only 49 out of 97 models have reference posterior samples
 
-# check the transform parameter block
+## check the transformed parameters block ##
 # for(id in model_record){
-id = 95
+id = 24
   cat("id:", id)
   po <- posterior(pn[id], pdb = pd)
   sc <- stan_code(po)
@@ -161,6 +161,7 @@ table(as.integer(which(lp_explore_n_iters == L) / M - 0.5 / M) + 1)
 # 9 24 27 40 41 
 # 20 20  1  1  1 
 
+
 ## check the distribution of sum of leapfrogs ##
 n_leapfrog_mean <- colMeans(lp_explore_n_leapfrog[, -takeoff])
 mean(n_leapfrog_mean, na.rm = TRUE) # 18013.83
@@ -171,6 +172,17 @@ jpeg(filename = paste0("../pics/hist_leapfrogs.jpeg"),
 hist(lp_explore_n_leapfrog[, -takeoff], breaks = 200, 
      main = "No. leapfrogs to reach target interval",
      xlab = "No. leapfrogs")
+dev.off()
+
+jpeg(filename = paste0("../pics/hist_leapfrogs_log.jpeg"),
+     width = width/2, height = height/2, units = "px", pointsize = 12)
+df <- data.frame(sum_leapfrog = c(lp_explore_n_leapfrog[, -takeoff][
+  !is.na(lp_explore_n_leapfrog[, -takeoff])]))
+p_leapfrog <- ggplot(data =df , aes(x = sum_leapfrog)) +
+  geom_histogram(color="black", fill="white", bins = 60) + scale_x_log10() +
+  xlab("No. of leapfrogs") + 
+  labs(title = "No. of leapfrogs to reach target interval")
+print(p_leapfrog)
 dev.off()
 
 #' Around 80.1% of phase I MCMC chains spend less than 4000
@@ -199,31 +211,6 @@ table(as.integer(which(lp_explore_n_leapfrog > 3e4) / M - 0.5 / M) + 1)
 # 3  9 10 14 24 27 37 
 # 1 20  1  2 20  1  6
 
-#' In summary, the current Stan algorithm for phase I is slow for model 9 and 24
-
-#' After checking model 9 and 24, I found that the lp__ posterior interval based
-#' on the reference posterior samples seems to be incorrect. See, e.g. 
-#' No9-earnings-earn_height_2.jpeg. One chain for model 27 got stuck, 
-#' (see No27-hudson_lynx_hare-lotka_volterra.jpeg), but the remaining chains 
-#' are fine,(see No27-hudson_lynx_hare-lotka_volterra_no6.jpeg). 
-#' Similar for model 40 and 41. After taking off model 9 and 24 and chain 
-#' with problem, the hist of sum_leapfrog is:
-hist(lp_explore_n_iters[-which(lp_explore_n_iters == 1000)], 
-     breaks = 100, 
-     main = "No. iters to reach target interval, truncate at 1000",
-     xlab = "No. iters")
-
-#' Over 99% of phase I MCMC chains of lp__ reach the target interval 
-sum((lp_explore_n_iters[-which(lp_explore_n_iters == 1000)] <= 300), 
-    na.rm = TRUE) / 
-  sum(!is.na(lp_explore_n_iters[-which(lp_explore_n_iters == 1000)]))
-
-#' The current Stan algorithm for phase I is slow for model 2 and 3 
-lp_explore_n_iters[which(lp_explore_n_iters < 1000 & lp_explore_n_iters >= 300)] 
-table(as.integer(which(lp_explore_n_iters < 1000 & 
-                         lp_explore_n_iters >= 300) / M - 0.5 / M) + 1)
-# 2  3 27 
-# 3  4  1
 
 #' check the histogram of number of leapfrogs, distribution of the sum of 
 #' leapfrogs before reaching target interval is highly right skewed
