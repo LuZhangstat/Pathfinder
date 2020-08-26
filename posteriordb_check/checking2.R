@@ -60,7 +60,7 @@ dev.off()
 
 jpeg(filename = paste0("../pics/box_leapfrogs_log.jpeg"),
      width = width*1.3, height = height*2, units = "px", pointsize = 12)
-p_box_leapfrog <- ggplot(df, aes(y = reorder(model, n_leapfrogs, FUN = median), 
+p_box_leapfrog <- ggplot(df, aes(y = reorder(model, n_iters, FUN = median), 
                                  x = n_leapfrogs)) + 
   geom_boxplot() + scale_x_log10() + ylab("") + xlab("No. of leapfrogs") + 
   theme_grey(base_size = 26)
