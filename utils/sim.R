@@ -29,13 +29,20 @@ opt_path <- function(x_init, fn, gr, N = 25) {
   y[1, 1:D] <- x_init
   y[1, D + 1] <- fn(x_init)
   for (n in 1:N) {
-    z <- optim(par = x_init,
-               fn = function(x) -fn(x),  # negate for maximization
-               gr = function(x) -gr(x),
-               method = "L-BFGS-B",
-               control = list(maxit = n,
-                              abstol = 1e-4,
-                              reltol = 1e-2))
+    break_opt <- FALSE
+    tryCatch(z <- optim(par = x_init,
+                        fn = function(x) -fn(x),  # negate for maximization
+                        gr = function(x) -gr(x),
+                        method = "L-BFGS-B",
+                        control = list(maxit = n, factr = 1e4
+                                       #abstol = 1e-4, reltol = 1e-2
+                        )), 
+             error = function(e) { break_opt <<- TRUE})
+    if(break_opt) { 
+      print("Error in obtaining optimization path.")
+      return(y[1:n, 1:(D + 1)])
+      }
+    
     y[n + 1, 1:D] <- z$par
     y[n + 1, D + 1] <- fn(z$par)
     # break if no change in objective
@@ -63,11 +70,28 @@ opt_path_stan <- function(model, data, N = 25, init_bound = 2) {
   posterior <- to_posterior(model, data)
   D <- get_num_upars(posterior)
   init <- runif(D, -init_bound, init_bound)
-  fn <- function(theta) log_prob(posterior, theta)
+  fn <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
+                                 gradient = TRUE)[1]
   gr <- function(theta) grad_log_prob(posterior, theta)
   out <- opt_path(init, fn, gr, N)
-  colnames(out) <- posterior@model_pars
   return(out)
+}
+
+opt_path_stan_parallel <- function(seed_list, mc.cores, 
+                                   model, data, N, init_bound){
+  posterior <- to_posterior(model, data)
+  D <- get_num_upars(posterior)
+  fn <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
+                                 gradient = TRUE)[1]
+  gr <- function(theta) grad_log_prob(posterior, theta)
+  MC = length(seed_list)
+  init = c()
+  for(i in 1:MC){
+    set.seed(seed_list[i])
+    init[[i]] <- runif(D, -init_bound, init_bound)
+  }
+  out <- mclapply(init, opt_path, fn = fn, gr = gr, N = N, 
+                  mc.cores = mc.cores)
 }
 
 # Return optimization path with last column (objective function value)
@@ -90,6 +114,7 @@ lp_draws <- function(model, data, init_param_unc) {
   init_fun <- function(chain_id) constrain_pars(posterior, init_param_unc)
   fit <- sampling(model, data = data, init = init_fun,
                   chains = 1, iter = iter, warmup = 0, refresh = 0,
+                  
                   control = list(metric = "unit_e",
                                  adapt_engaged = FALSE,
                                  max_treedepth = max_treedepth,
@@ -113,7 +138,8 @@ is_typical <- function(model, data, param) {
   increase_count / M
 }
 
-find_typical <- function(model, data, param_path, M = 100) {
+find_typical <- function(param_path, model, data, M = 100) {
+  typical_index <- c()          # return the index of sample in param_path that is identified as a good initial
   N <- dim(param_path)[1]
   D <- dim(param_path)[2] - 1   # includes objective in last position
   for (n in 1:N) {
@@ -123,9 +149,12 @@ find_typical <- function(model, data, param_path, M = 100) {
     # declare typical if in central 90% interval of random increase/decrease
     lb = qbinom(0.05, M, 0.5) / M
     ub = qbinom(0.95, M, 0.5) / M
-    if (increase_prop >= lb && increase_prop <= ub)
+    if (increase_prop >= lb && increase_prop <= ub){
       print(param_path[n, 1:(D + 1)], digits = 2)
+      typical_index <- c(typical_index, n)
+    }
   }
+  return(typical_index)
 }
 
 # library('rstan')
@@ -146,3 +175,4 @@ find_typical <- function(model, data, param_path, M = 100) {
 # data = list(D = D)
 # opath <- opt_path_stan(model, data = data, N = 75, init_bound = 5)
 # find_typical(model, data, opath)
+
