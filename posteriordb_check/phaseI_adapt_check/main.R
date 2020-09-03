@@ -21,12 +21,24 @@ L_pn = length(pn)
 
 # parameters settings #
 alpha = 0.01
-N = 75    # Maximum iters in optimization
+N = 100    # Maximum iters in optimization
 mc.cores = parallel::detectCores() - 2
 M = mc.cores    # 20 iterations
 init_bound = 2
 width = 860; height = 740 # the size of the plot
 seed_list = 1:M
+
+## setting 1 ##
+# iter <- 2
+# max_treedepth <- 3
+# stepsize <- 0.005
+
+## setting 2 no stepsize##
+# iter <- 2
+# max_treedepth <- 5
+# stepsize <- 0.005
+# M = 40
+# N = 100
 
 # preallocate results #
 lp_INV <- array(data = NA, dim = c(2, L_pn))
@@ -55,10 +67,9 @@ for(l in 1:L_pn){
 N_models
 
 
-for(l in 1:L_pn){
-  if(all(l != model_record)){next}
-  modelname <- pn[l]
-  printf("model %d: %s", l, modelname)
+for(i in 1:length(model_record)){
+  modelname <- pn[model_record[i]]
+  printf("model %d: %s", model_record[i], modelname)
   
   # pick model
   po <- posterior(modelname, pdb = pd)
@@ -70,7 +81,7 @@ for(l in 1:L_pn){
   model <- stan_model(model_code = sc)
   # obtain posterior interval of lp__
   INV <- lp_Int_q_posteriordb(po, alpha)
-  lp_INV[, l] = INV
+  lp_INV[, i] = INV
   ###  run Bob's Phase I  ###
   data <- get_data(po)
   opath <- opt_path_stan_parallel(seed_list, mc.cores, 
@@ -78,20 +89,21 @@ for(l in 1:L_pn){
   pick_ind <- mclapply(opath, find_typical, model = model, 
                        data = data, mc.cores = mc.cores) 
   
-  lp_opath[[l]] <- list(opath = opath, pick_ind = pick_ind)
+  lp_opath[[i]] <- list(opath = opath, pick_ind = pick_ind)
 }
 
-# save(file = "../results/lp_posteriordb_phI_adapt.RData",
+find_typical(opath[[2]], model, data)
+# save(file = "../results/lp_posteriordb_phI_adapt_set2.RData",
 #      list = c("lp_opath", "lp_INV", "model_record"))
-#
+
 
 # load("../results/lp_posteriordb_phI_adapt.RData")
 
 ## check the plots ##
-for(l in model_record){
-  modelname <- pn[l]
-  printf("model %d: %s", l, modelname)
-  Lp_list = unlist(sapply(lp_opath[[l]]$opath, 
+for(i in 1:length(model_record)){
+  modelname <- pn[model_record[i]]
+  printf("model %d: %s", model_record[i], modelname)
+  Lp_list = unlist(sapply(lp_opath[[i]]$opath, 
                           f <- function(x){
                             if(is.vector(x)){
                               return(1)
@@ -101,7 +113,7 @@ for(l in model_record){
   chain_id = (1:M)[!is.na(Lp_list)]
   p_lp_trace = 
     data.frame(iter = c(unlist(sapply(chain_id, f <- function(x){1:Lp_list[x]}))), 
-               lp__ = c(unlist(sapply(lp_opath[[l]]$opath[chain_id], 
+               lp__ = c(unlist(sapply(lp_opath[[i]]$opath[chain_id], 
                                       f <- function(x){if(is.null(dim(x))){
                                         return(x[length(x)])
                                       }else{ return(x[, ncol(x)])}}))),
@@ -111,7 +123,7 @@ for(l in model_record){
                    out = c("not preferred init")
                  } else{
                    out = rep("not preferred init", Lp_list[x])
-                   out[lp_opath[[l]]$pick_ind[[x]]] = "preferred init"
+                   out[lp_opath[[i]]$pick_ind[[x]]] = "preferred init"
                    if(length(out) > Lp_list[x]){
                      out = rep("error in finding init", Lp_list[x])
                    }} 
@@ -120,16 +132,42 @@ for(l in model_record){
   p_lp <- ggplot(data = p_lp_trace, 
                  aes(x=iter, y=lp__, group=chain, color=label)) +
     geom_line(colour = "grey") + geom_point(size = 1) + 
-    geom_hline(yintercept = lp_INV[, l], colour = "black") + 
-    ylim(min(lp_INV[, l] - (lp_INV[2, l] - lp_INV[1, l]), 
-             quantile(p_lp_trace$lp__, 0.1)),
-         max(lp_INV[2, l] + (lp_INV[2, l] - lp_INV[1, l]), 
+    geom_hline(yintercept = lp_INV[, i], colour = "black") + 
+    ylim(min(lp_INV[1, i] - (lp_INV[2, i] - lp_INV[1, i]), 
+             quantile(p_lp_trace$lp__, 0.2)),
+         max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
              max(p_lp_trace$lp__)))
   
-  jpeg(filename = paste0("../pics/phI_adapt/No",l,"-", modelname, ".jpeg"),
+  jpeg(filename = paste0("../pics/phI_adapt/No", model_record[i], "-", 
+                         modelname, ".jpeg"),
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
 }
+
+
+## check the model with largest leapfrogs iterations
+##No: 9: earnings-earn_height          ## similar to the fitting, not reach the INV
+##No: 37: kilpisjarvi_mod-kilpisjarvi  ## zero
+##No: 14: earnings-logearn_interaction ## almost zero
+##No: 11: earnings-logearn_height_male ## almost zero
+##No: 10: earnings-log10earn_height    ## zero
+##No: 12: earnings-logearn_height      ## zero
+##No: 48: mesquite-mesquite            ## multimodel? A lot
+##No: 6: diamonds-diamonds             ## check 6 ??
+##No: 3: bball_drive_event_0-hmm_drive_0 # multimodel. Also need checking
+##No: 41: mcycle_gp-accel_gp           ## Not very good
+
+i = which(model_record == 37)
+p_lp <- ggplot(data = p_lp_trace, 
+               aes(x=iter, y=lp__, group=chain, color=label)) +
+  geom_line(colour = "grey") + geom_point(size = 1) + 
+  geom_hline(yintercept = lp_INV[, i], colour = "black") + 
+  ylim(lp_INV[1, i] - 10*(lp_INV[2, i] - lp_INV[1, i]),
+       max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
+           max(p_lp_trace$lp__)))
+p_lp
+
+
 
 
