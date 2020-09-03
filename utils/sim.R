@@ -114,7 +114,6 @@ lp_draws <- function(model, data, init_param_unc) {
   init_fun <- function(chain_id) constrain_pars(posterior, init_param_unc)
   fit <- sampling(model, data = data, init = init_fun,
                   chains = 1, iter = iter, warmup = 0, refresh = 0,
-                  
                   control = list(metric = "unit_e",
                                  adapt_engaged = FALSE,
                                  max_treedepth = max_treedepth,
@@ -128,8 +127,7 @@ increased <- function(lps) {
   lps[length(lps)] > lps[1]
 }
 
-is_typical <- function(model, data, param) {
-  M <- 100
+is_typical <- function(model, data, param, M) {
   increase_count <- 0
   for (m in 1:M) {
     lps <- lp_draws(model, data, param)
@@ -138,12 +136,12 @@ is_typical <- function(model, data, param) {
   increase_count / M
 }
 
-find_typical <- function(param_path, model, data, M = 100) {
+find_typical <- function(param_path, model, data, M = 20) {
   typical_index <- c()          # return the index of sample in param_path that is identified as a good initial
   N <- dim(param_path)[1]
   D <- dim(param_path)[2] - 1   # includes objective in last position
   for (n in 1:N) {
-    increase_prop <- is_typical(model, data, param_path[n, 1:D])
+    increase_prop <- is_typical(model, data, param_path[n, 1:D], M)
     printf("n = %3d;  increase proportion = %3.2f",
            n, increase_prop)
     # declare typical if in central 90% interval of random increase/decrease
