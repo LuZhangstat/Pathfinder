@@ -108,7 +108,7 @@ params_only <- function(path) {
 
 lp_draws <- function(model, data, init_param_unc) {
   iter <- 2
-  max_treedepth <- 3
+  max_treedepth <- 5
   stepsize <- 0.005
   posterior <- to_posterior(model, data)
   init_fun <- function(chain_id) constrain_pars(posterior, init_param_unc)
@@ -116,8 +116,10 @@ lp_draws <- function(model, data, init_param_unc) {
                   chains = 1, iter = iter, warmup = 0, refresh = 0,
                   control = list(metric = "unit_e",
                                  adapt_engaged = FALSE,
-                                 max_treedepth = max_treedepth,
-                                 stepsize = stepsize))
+                                 max_treedepth = max_treedepth #,
+                                 #stepsize = stepsize
+                                 ))
+  
   draws <- extract(fit, pars = c("lp__"), permute = FALSE)
   draws[1:iter]
 }
@@ -136,7 +138,7 @@ is_typical <- function(model, data, param, M) {
   increase_count / M
 }
 
-find_typical <- function(param_path, model, data, M = 20) {
+find_typical <- function(param_path, model, data, M = 40) {
   typical_index <- c()          # return the index of sample in param_path that is identified as a good initial
   N <- dim(param_path)[1]
   D <- dim(param_path)[2] - 1   # includes objective in last position
