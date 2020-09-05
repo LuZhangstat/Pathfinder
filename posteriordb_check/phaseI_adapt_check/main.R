@@ -33,12 +33,20 @@ seed_list = 1:M
 # max_treedepth <- 3
 # stepsize <- 0.005
 
-## setting 2 no stepsize##
+## setting 2 larger treedepth##
 # iter <- 2
 # max_treedepth <- 5
 # stepsize <- 0.005
 # M = 40
 # N = 100
+
+## setting 3 adapt stepsize##
+# iter <- 3
+# max_treedepth <- 6
+# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2^2
+# M = 60
+# N = 100
+
 
 # preallocate results #
 lp_INV <- array(data = NA, dim = c(2, L_pn))
@@ -92,8 +100,11 @@ for(i in 1:length(model_record)){
   lp_opath[[i]] <- list(opath = opath, pick_ind = pick_ind)
 }
 
-find_typical(opath[[2]], model, data)
-# save(file = "../results/lp_posteriordb_phI_adapt_set2.RData",
+find_typical(opath[[3]], model, data)
+init_param_unc <- opath[[3]][4, -ncol(opath[[3]])]
+tt <- get_sampler_params(fit_0)
+
+# save(file = "../results/lp_posteriordb_phI_adapt_set3.RData",
 #      list = c("lp_opath", "lp_INV", "model_record"))
 
 
@@ -169,5 +180,7 @@ p_lp <- ggplot(data = p_lp_trace,
 p_lp
 
 
-
+## errors in finding optimization path
+## divergents in the MCMC sampling, stepsize
+## slow
 
