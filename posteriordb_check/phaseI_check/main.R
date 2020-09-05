@@ -83,8 +83,9 @@ for(l in 1:L_pn){
                           lp__ = c(lp_phI[1:L_p, ]))
   p_lp <- ggplot(data = p_lp_trace, 
                  aes(x=iter, y=lp__, group=chain, color=chain)) + geom_line() +
-    geom_hline(yintercept = INV)
-  jpeg(filename = paste0("../pics/No",l,"-", modelname, ".jpeg"),
+    geom_hline(yintercept = INV) + ylim(INV[1] - 10*(INV[2] - INV[1]), 
+                                        INV[2] + 2*(INV[2] - INV[1]))
+  jpeg(filename = paste0("../pics/No",l,"-", modelname, "_3.jpeg"),
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
@@ -140,6 +141,7 @@ takeoff <- c(21, 24)
 ## check the distribution of number of iterations ##
 n_iters_mean <- colMeans(lp_explore_n_iters[, -takeoff])
 mean(n_iters_mean, na.rm = TRUE) # 69.11596
+median(lp_explore_n_iters[, -takeoff], na.rm = TRUE) # 26
 sd(n_iters_mean, na.rm = TRUE)   # 144.9198
 sd(lp_explore_n_iters[, -takeoff], na.rm = TRUE) # 159.7554
 jpeg(filename = paste0("../pics/hist_iters.jpeg"),
@@ -165,6 +167,7 @@ table(as.integer(which(lp_explore_n_iters == L) / M - 0.5 / M) + 1)
 ## check the distribution of sum of leapfrogs ##
 n_leapfrog_mean <- colMeans(lp_explore_n_leapfrog[, -takeoff])
 mean(n_leapfrog_mean, na.rm = TRUE) # 18013.83
+median(lp_explore_n_leapfrog[, -takeoff], na.rm = TRUE) # 645.5
 sd(n_leapfrog_mean, na.rm = TRUE)   # 94313.19
 sd(lp_explore_n_leapfrog[, -takeoff], na.rm = TRUE) # 98874.89
 jpeg(filename = paste0("../pics/hist_leapfrogs.jpeg"),
@@ -180,8 +183,8 @@ df <- data.frame(sum_leapfrog = c(lp_explore_n_leapfrog[, -takeoff][
   !is.na(lp_explore_n_leapfrog[, -takeoff])]))
 p_leapfrog <- ggplot(data =df , aes(x = sum_leapfrog)) +
   geom_histogram(color="black", fill="white", bins = 60) + scale_x_log10() +
-  xlab("No. of leapfrogs") + 
-  labs(title = "No. of leapfrogs to reach target interval")
+  xlab("No. of leapfrogs") 
+#+ labs(title = "No. of leapfrogs to reach target interval")
 print(p_leapfrog)
 dev.off()
 
@@ -192,6 +195,8 @@ sum((lp_explore_n_leapfrog[, -takeoff] <= 4000), na.rm = TRUE) /
   sum(!is.na(lp_explore_n_leapfrog[, -takeoff]))
 mean(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_leapfrog[, -takeoff] < 4e3)])
 #[1] 852.5551
+median(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_leapfrog[, -takeoff] < 4e3)])
+# [1] 385
 sd(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_leapfrog[, -takeoff] < 4e3)])
 #[1] 958.3538
 
@@ -203,6 +208,8 @@ sum((lp_explore_n_leapfrog[, -takeoff] <= 3e4), na.rm = TRUE) /
 
 mean(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_iters[, -takeoff] < 200)])
 # [1] 2964.708
+median(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_iters[, -takeoff] < 200)])
+# [1] 541
 sd(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_iters[, -takeoff] < 200)])
 # [1] 6041.258
 

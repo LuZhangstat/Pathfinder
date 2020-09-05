@@ -51,7 +51,7 @@ df <- data.frame(n_iters = c(lp_explore_n_iters[, model_record]),
 
 jpeg(filename = paste0("../pics/box_iters_log.jpeg"),
      width = width*1.3, height = height*2, units = "px", pointsize = 12)
-p_box_iter <- ggplot(df, aes(y = reorder(model, n_iters, FUN = median), 
+p_box_iter <- ggplot(df, aes(y = reorder(model, n_leapfrogs, FUN = median), 
                              x = n_iters)) + geom_boxplot() + 
   scale_x_log10() + ylab("") + xlab("No. of iterations") + 
   theme_grey(base_size = 26)

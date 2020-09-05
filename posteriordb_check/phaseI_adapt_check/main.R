@@ -23,7 +23,7 @@ L_pn = length(pn)
 alpha = 0.01
 N = 100    # Maximum iters in optimization
 mc.cores = parallel::detectCores() - 2
-M = mc.cores    # 20 iterations
+M = mc.cores    # 10 iterations
 init_bound = 2
 width = 860; height = 740 # the size of the plot
 seed_list = 1:M
@@ -108,7 +108,7 @@ tt <- get_sampler_params(fit_0)
 #      list = c("lp_opath", "lp_INV", "model_record"))
 
 
-# load("../results/lp_posteriordb_phI_adapt.RData")
+# load("../results/lp_posteriordb_phI_adapt_set3.RData")
 
 ## check the plots ##
 for(i in 1:length(model_record)){
@@ -169,7 +169,7 @@ for(i in 1:length(model_record)){
 ##No: 3: bball_drive_event_0-hmm_drive_0 # multimodel. Also need checking
 ##No: 41: mcycle_gp-accel_gp           ## Not very good
 
-i = which(model_record == 37)
+i = which(model_record == 27)
 p_lp <- ggplot(data = p_lp_trace, 
                aes(x=iter, y=lp__, group=chain, color=label)) +
   geom_line(colour = "grey") + geom_point(size = 1) + 
