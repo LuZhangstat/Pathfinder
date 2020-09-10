@@ -21,17 +21,18 @@ L_pn = length(pn)
 
 # parameters settings #
 alpha = 0.01
-N = 100    # Maximum iters in optimization
+N = 70    # Maximum iters in optimization
 mc.cores = parallel::detectCores() - 2
-M = mc.cores    # 10 iterations
+MC = mc.cores    # 10 iterations
 init_bound = 2
-width = 860; height = 740 # the size of the plot
-seed_list = 1:M
+width = 600; height = 500 # the size of the plot
+seed_list = 1:MC
 
 ## setting 1 ##
 # iter <- 2
 # max_treedepth <- 3
 # stepsize <- 0.005
+# M = 20
 
 ## setting 2 larger treedepth##
 # iter <- 2
@@ -42,7 +43,7 @@ seed_list = 1:M
 
 ## setting 3 adapt stepsize##
 # iter <- 3
-# max_treedepth <- 6
+# max_treedepth <- 4
 # stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2^2
 # M = 60
 # N = 100
@@ -58,7 +59,6 @@ model_record = c()
 for(l in 1:L_pn){
   if(any(l == takeoff)){next}
   modelname <- pn[l]
-  # printf("model %d: %s", l, modelname)
   
   # pick model
   po <- posterior(modelname, pdb = pd)
@@ -71,6 +71,7 @@ for(l in 1:L_pn){
     next }
   N_models = N_models + 1
   model_record = c(model_record, l)
+  printf("model %d: %s", l, modelname)
 }
 N_models
 
@@ -100,20 +101,24 @@ for(i in 1:length(model_record)){
   lp_opath[[i]] <- list(opath = opath, pick_ind = pick_ind)
 }
 
-find_typical(opath[[3]], model, data)
-init_param_unc <- opath[[3]][4, -ncol(opath[[3]])]
-tt <- get_sampler_params(fit_0)
+test_ind <- find_typical(opath[[9]], model, data)
+opath[[9]][test_ind, ncol(opath[[9]])]
+init_param_unc <- opath[[9]][1, -ncol(opath[[9]])]
+# tt <- get_sampler_params(fit_0)
+# tt2 <- unlist(sapply(opath2, f <- function(x){ x[ , ncol(x)]}))
+# hist(tt2[tt2>-2000])
 
 # save(file = "../results/lp_posteriordb_phI_adapt_set3.RData",
 #      list = c("lp_opath", "lp_INV", "model_record"))
 
 
-# load("../results/lp_posteriordb_phI_adapt_set3.RData")
+# load("../results/lp_posteriordb_phI_adapt_set2.RData")
 
 ## check the plots ##
 for(i in 1:length(model_record)){
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
+  #i = model_record[i]
   Lp_list = unlist(sapply(lp_opath[[i]]$opath, 
                           f <- function(x){
                             if(is.vector(x)){
@@ -121,7 +126,7 @@ for(i in 1:length(model_record)){
                             }else if(is.null(dim(x))){
                               return(NA)
                             }else{return(nrow(x))}}))
-  chain_id = (1:M)[!is.na(Lp_list)]
+  chain_id = (1:MC)[!is.na(Lp_list)]
   p_lp_trace = 
     data.frame(iter = c(unlist(sapply(chain_id, f <- function(x){1:Lp_list[x]}))), 
                lp__ = c(unlist(sapply(lp_opath[[i]]$opath[chain_id], 
@@ -131,26 +136,27 @@ for(i in 1:length(model_record)){
                chain = c(unlist(sapply(chain_id, f <- function(x){rep(x, Lp_list[x])}))),
                label = c(unlist(sapply(chain_id, f <- function(x){
                  if(Lp_list[x] == 1){
-                   out = c("not preferred init")
+                   out = c("point on optim path")
                  } else{
-                   out = rep("not preferred init", Lp_list[x])
-                   out[lp_opath[[i]]$pick_ind[[x]]] = "preferred init"
+                   out = rep("point on optim path", Lp_list[x])
+                   out[lp_opath[[i]]$pick_ind[[x]]] = "marked point"
                    if(length(out) > Lp_list[x]){
-                     out = rep("error in finding init", Lp_list[x])
+                     out = rep("point on optim path", Lp_list[x]) # error in HMC sampling
                    }} 
                  return(out)}))))
   
   p_lp <- ggplot(data = p_lp_trace, 
                  aes(x=iter, y=lp__, group=chain, color=label)) +
-    geom_line(colour = "grey") + geom_point(size = 1) + 
+    geom_line(colour = "grey") + geom_point(size = 2) + 
     geom_hline(yintercept = lp_INV[, i], colour = "black") + 
     ylim(min(lp_INV[1, i] - (lp_INV[2, i] - lp_INV[1, i]), 
              quantile(p_lp_trace$lp__, 0.2)),
          max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
-             max(p_lp_trace$lp__)))
+             max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
+    theme_bw() 
   
   jpeg(filename = paste0("../pics/phI_adapt/No", model_record[i], "-", 
-                         modelname, ".jpeg"),
+                         modelname, ".jpeg"), #model_record[i]
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
