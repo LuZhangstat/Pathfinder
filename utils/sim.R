@@ -34,26 +34,39 @@ opt_path <- function(x_init, fn, gr, N = 25) {
                         fn = function(x) -fn(x),  # negate for maximization
                         gr = function(x) -gr(x),
                         method = "L-BFGS-B",
-                        control = list(maxit = n, factr = 1e4
-                                       #abstol = 1e-4, reltol = 1e-2
-                        )), 
+                        control = list(maxit = n, factr = 1e9#, ndeps = 1e-8 #, 
+                                       #trace = 6, REPORT = 1 
+                                       )), 
              error = function(e) { break_opt <<- TRUE})
     if(break_opt) { 
       print("Error in obtaining optimization path.")
       return(y[1:n, 1:(D + 1)])
-      }
+    }
     
     y[n + 1, 1:D] <- z$par
     y[n + 1, D + 1] <- fn(z$par)
     # break if no change in objective
     printf("n = %4d, last = %f;   this = %f",
            n, y[n, D + 1], y[n + 1, D + 1])
+    print(z$counts)
     if (y[n, D + 1] == y[n + 1, D + 1]) {
       return(y[1:n, 1:(D + 1)])
     }
   }
   y
 }
+
+# experimental code
+# tt <- capture.output(z <- optim(par = x_init,
+#                           fn = function(x) -fn(x),  # negate for maximization
+#                           gr = function(x) -gr(x),
+#                           method = "L-BFGS-B",
+#                           control = list(maxit = N, factr = 1e8,
+#                                          trace = 6, REPORT = 1)))
+# 
+# tt2 <- sapply(strsplit(tt[seq(23, (length(tt) -14), by = 4)], split = " "), 
+#        f <- function(x){as.numeric(x[c(-1, -2)])})
+  
 
 # Returns optimization path for specified Stan model and data for
 # the specified number of iterations using the specified bound on
@@ -107,8 +120,8 @@ params_only <- function(path) {
 }
 
 lp_draws <- function(model, data, init_param_unc) {
-  iter <- 3
-  max_treedepth <- 4
+  iter <- 1
+  max_treedepth <- 6
   # stepsize <- 0.005
   posterior <- to_posterior(model, data)
   init_fun <- function(chain_id) constrain_pars(posterior, init_param_unc)
@@ -121,7 +134,7 @@ lp_draws <- function(model, data, init_param_unc) {
                                  #stepsize = stepsize
                                  ),
                   save_warmup = TRUE)
-  stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2^2
+  stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2
   
   fit <- sampling(model, data = data, init = init_fun,
                     chains = 1, iter = iter, warmup = 0, refresh = 0,
@@ -139,13 +152,20 @@ increased <- function(lps) {
   lps[length(lps)] > lps[1]
 }
 
-is_typical <- function(model, data, param, M) {
+stuck <- function(lps) {
+  # simple comparison of endpoint rather than whole path
+  lps[length(lps)] == lps[1]
+}
+
+is_typical <- function(model, data, param, M, lp_0) {
   increase_count <- 0
+  stuck_count <- 0
   for (m in 1:M) {
     lps <- lp_draws(model, data, param)
-    increase_count <- increase_count + increased(lps)
+    increase_count <- increase_count + (lps[length(lps)] > lp_0) # increased(lps)
+    stuck_count <- stuck_count + (lps[length(lps)] == lp_0) #stuck(lps)
   }
-  increase_count / M
+  return(c(increase_count, stuck_count))
 }
 
 find_typical <- function(param_path, model, data, M = 60) {
@@ -153,9 +173,16 @@ find_typical <- function(param_path, model, data, M = 60) {
   N <- dim(param_path)[1]
   D <- dim(param_path)[2] - 1   # includes objective in last position
   for (n in 1:N) {
-    increase_prop <- is_typical(model, data, param_path[n, 1:D], M)
-    printf("n = %3d;  increase proportion = %3.2f",
-           n, increase_prop)
+    increase_counts <- is_typical(model, data, param_path[n, 1:D], M, 
+                                  param_path[n, D + 1])
+    # printf("n = %3d;  increase proportion = %3.2f",
+    #        n, increase_prop)
+    printf("n = %3d;  increase count = %3d, stick count = %3d",
+           n, increase_counts[1], increase_counts[2])
+    #print(param_path[n, 1:(D + 1)], digits = 2)
+    if(increase_counts[2] == M){next} # if all chains divergent, skip
+    
+    increase_prop = increase_counts[1] / (M - increase_counts[2])
     # declare typical if in central 90% interval of random increase/decrease
     lb = qbinom(0.05, M, 0.5) / M
     ub = qbinom(0.95, M, 0.5) / M
