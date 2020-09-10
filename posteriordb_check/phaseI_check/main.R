@@ -147,8 +147,8 @@ sd(lp_explore_n_iters[, -takeoff], na.rm = TRUE) # 159.7554
 jpeg(filename = paste0("../pics/hist_iters.jpeg"),
      width = width, height = height, units = "px", pointsize = 12)
 hist(lp_explore_n_iters[, -takeoff], breaks = 100, 
-     main = "No. iters to reach target interval",
-     xlab = "No. iters")
+     main = "", ylab = "", axes = TRUE,
+     xlab = "iterations")
 dev.off()
 
 
@@ -174,7 +174,7 @@ jpeg(filename = paste0("../pics/hist_leapfrogs.jpeg"),
      width = width, height = height, units = "px", pointsize = 12)
 hist(lp_explore_n_leapfrog[, -takeoff], breaks = 200, 
      main = "No. leapfrogs to reach target interval",
-     xlab = "No. leapfrogs")
+     xlab = "leapfrogs")
 dev.off()
 
 jpeg(filename = paste0("../pics/hist_leapfrogs_log.jpeg"),
