@@ -53,7 +53,7 @@ jpeg(filename = paste0("../pics/box_iters_log.jpeg"),
      width = width*1.3, height = height*2, units = "px", pointsize = 12)
 p_box_iter <- ggplot(df, aes(y = reorder(model, n_leapfrogs, FUN = median), 
                              x = n_iters)) + geom_boxplot() + 
-  scale_x_log10() + ylab("") + xlab("No. of iterations") + 
+  scale_x_log10() + ylab("") + xlab("iterations") + 
   theme_grey(base_size = 26)
 print(p_box_iter)
 dev.off()
@@ -62,10 +62,24 @@ jpeg(filename = paste0("../pics/box_leapfrogs_log.jpeg"),
      width = width*1.3, height = height*2, units = "px", pointsize = 12)
 p_box_leapfrog <- ggplot(df, aes(y = reorder(model, n_leapfrogs, FUN = median), 
                                  x = n_leapfrogs)) + 
-  geom_boxplot() + scale_x_log10() + ylab("") + xlab("No. of leapfrogs") + 
-  theme_grey(base_size = 26)
+  geom_boxplot()  + ylab("") + xlab("leapfrog steps") + 
+  theme_grey(base_size = 26) + 
+  scale_x_log10(breaks=c(10, 1e3, 1e5), labels = c("10", "1000", "100,000"))
 p_box_leapfrog
 dev.off()
+
+# histogram ggplot #
+jpeg(filename = paste0("../pics/hist_iters.jpeg"),
+     width = width, height = height, units = "px", pointsize = 12)
+p_hist <- ggplot(df, aes(x = n_iters)) + 
+  geom_histogram(bins = 100, color = "black", fill = "gray") +
+  theme_bw(base_size = 26) +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(), axis.title.y = element_blank())+
+  xlab("iterations") 
+print(p_hist)
+dev.off()
+
 
 
 
