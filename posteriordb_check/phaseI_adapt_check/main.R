@@ -21,7 +21,7 @@ L_pn = length(pn)
 
 # parameters settings #
 alpha = 0.01
-N = 70    # Maximum iters in optimization
+N = 60    # Maximum iters in optimization
 mc.cores = parallel::detectCores() - 2
 MC = mc.cores    # 10 iterations
 init_bound = 2
@@ -48,9 +48,33 @@ seed_list = 1:MC
 # M = 60
 # N = 100
 
+## setting 4 adapt stepsize##
+# iter <- 1
+# max_treedepth <- 6
+# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 3*2
+# M = 60
+# N = 60
+# 50% Center interval
+
+## setting 5 adapt stepsize##
+# iter <- 1
+# max_treedepth <- 6
+# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 3*2
+# M = 60
+# N = 60
+# 80% Center interval
+
+
+##setting 6 ##
+# iter <- 1
+# max_treedepth <- 10
+# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2
+
+
 
 # preallocate results #
 lp_INV <- array(data = NA, dim = c(2, L_pn))
+lp_mean <- c()
 lp_opath <- c()
 takeoff <- c(21, 24)
 
@@ -75,7 +99,6 @@ for(l in 1:L_pn){
 }
 N_models
 
-
 for(i in 1:length(model_record)){
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
@@ -90,7 +113,8 @@ for(i in 1:length(model_record)){
   model <- stan_model(model_code = sc)
   # obtain posterior interval of lp__
   INV <- lp_Int_q_posteriordb(po, alpha)
-  lp_INV[, i] = INV
+  lp_INV[, i] = INV[1:2]
+  lp_mean[i] = INV[3]
   ###  run Bob's Phase I  ###
   data <- get_data(po)
   opath <- opt_path_stan_parallel(seed_list, mc.cores, 
@@ -108,7 +132,7 @@ init_param_unc <- opath[[9]][1, -ncol(opath[[9]])]
 # tt2 <- unlist(sapply(opath2, f <- function(x){ x[ , ncol(x)]}))
 # hist(tt2[tt2>-2000])
 
-# save(file = "../results/lp_posteriordb_phI_adapt_set3.RData",
+# save(file = "../results/lp_posteriordb_phI_adapt_set6.RData",
 #      list = c("lp_opath", "lp_INV", "model_record"))
 
 
@@ -149,17 +173,62 @@ for(i in 1:length(model_record)){
                  aes(x=iter, y=lp__, group=chain, color=label)) +
     geom_line(colour = "grey") + geom_point(size = 2) + 
     geom_hline(yintercept = lp_INV[, i], colour = "black") + 
-    ylim(min(lp_INV[1, i] - (lp_INV[2, i] - lp_INV[1, i]), 
-             quantile(p_lp_trace$lp__, 0.2)),
+    geom_hline(yintercept = lp_mean[i], colour = "blue", linetype = 2)+
+    ylim(min(p_lp_trace$lp__)
+      #lp_INV[1, i] - 1.5*(lp_INV[2, i] - lp_INV[1, i])
+       # min(lp_INV[1, i] - (lp_INV[2, i] - lp_INV[1, i]),
+       #        quantile(p_lp_trace$lp__, 0.2))
+      ,
          max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
              max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
     theme_bw() 
   
   jpeg(filename = paste0("../pics/phI_adapt/No", model_record[i], "-", 
-                         modelname, ".jpeg"), #model_record[i]
+                         modelname, "_L.jpeg"), #model_record[i]
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
+  
+  p_lp <- ggplot(data = p_lp_trace, 
+                 aes(x=iter, y=lp__, group=chain, color=label)) +
+    geom_line(colour = "grey") + geom_point(size = 2) + 
+    geom_hline(yintercept = lp_INV[, i], colour = "black") + 
+    geom_hline(yintercept = lp_mean[i], colour = "blue", linetype = 2)+
+    ylim(#min(p_lp_trace$lp__)
+         lp_INV[1, i] - 1.5*(lp_INV[2, i] - lp_INV[1, i])
+         # min(lp_INV[1, i] - (lp_INV[2, i] - lp_INV[1, i]),
+         #        quantile(p_lp_trace$lp__, 0.2))
+         ,
+         max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
+             max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
+    theme_bw() 
+  
+  jpeg(filename = paste0("../pics/phI_adapt/No", model_record[i], "-", 
+                         modelname, "_s.jpeg"), #model_record[i]
+       width = width, height = height, units = "px", pointsize = 12)
+  print(p_lp)
+  dev.off()
+  
+  p_lp <- ggplot(data = p_lp_trace, 
+                 aes(x=iter, y=lp__, group=chain, color=label)) +
+    geom_line(colour = "grey") + geom_point(size = 2) + 
+    geom_hline(yintercept = lp_INV[, i], colour = "black") + 
+    geom_hline(yintercept = lp_mean[i], colour = "blue", linetype = 2)+
+    ylim(#min(p_lp_trace$lp__)
+         #lp_INV[1, i] - 1.5*(lp_INV[2, i] - lp_INV[1, i])
+         min(lp_INV[1, i] - (lp_INV[2, i] - lp_INV[1, i]),
+                quantile(p_lp_trace$lp__, 0.2))
+         ,
+         max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
+             max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
+    theme_bw() 
+  
+  jpeg(filename = paste0("../pics/phI_adapt/No", model_record[i], "-", 
+                         modelname, "_trun.jpeg"), #model_record[i]
+       width = width, height = height, units = "px", pointsize = 12)
+  print(p_lp)
+  dev.off()
+  
 }
 
 
@@ -175,7 +244,7 @@ for(i in 1:length(model_record)){
 ##No: 3: bball_drive_event_0-hmm_drive_0 # multimodel. Also need checking
 ##No: 41: mcycle_gp-accel_gp           ## Not very good
 
-i = which(model_record == 27)
+i = which(model_record == 55)
 p_lp <- ggplot(data = p_lp_trace, 
                aes(x=iter, y=lp__, group=chain, color=label)) +
   geom_line(colour = "grey") + geom_point(size = 1) + 
