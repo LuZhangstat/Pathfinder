@@ -13,8 +13,8 @@ lp_Int_q_posteriordb <- function(pick_model, alpha){
   data <- get_data(pick_model)
   pos_draws <- reference_posterior_draws(po, type = "draws")
   lp_recovers <- lp_recover(model, data, pos_draws)
-  quantile(lp_recovers, probs = c(alpha / 2.0, 1.0 - alpha / 2.0))
-  
+  c(quantile(lp_recovers, probs = c(alpha / 2.0, 1.0 - alpha / 2.0)),
+    mean(lp_recovers))
 }
 
 lp_recover <- function(model, data, pos_draws){
@@ -36,7 +36,7 @@ lp_recover <- function(model, data, pos_draws){
       j = j + n_inits[i]
     }
     log_prob(posterior, unconstrain_pars(posterior, par_template), 
-             adjust_transform = TRUE, gradient = TRUE)[1]
+             adjust_transform = FALSE, gradient = TRUE)[1]
   }
   lpn <- function(gsd_l) apply(sapply(gsd_l, unlist), 1, fn)
   sapply(pos_draws, lpn)

@@ -23,7 +23,7 @@ to_posterior <- function(model, data) {
 # @param N total number of iterations (default 25)
 # @return optimization path, matrix with N rows, each of which is a
 #         point on the optimization path followed by objective
-opt_path <- function(x_init, fn, gr, N = 25) {
+opt_path <- function(x_init, fn, gr, N = 25, lp_f) {
   D <- length(x_init)
   y <- matrix(NA, nrow = N + 1, ncol = D + 1)
   y[1, 1:D] <- x_init
@@ -34,7 +34,7 @@ opt_path <- function(x_init, fn, gr, N = 25) {
                         fn = function(x) -fn(x),  # negate for maximization
                         gr = function(x) -gr(x),
                         method = "L-BFGS-B",
-                        control = list(maxit = n, factr = 1e9#, ndeps = 1e-8 #, 
+                        control = list(maxit = n, factr = 1e10#, ndeps = 1e-8 #, 
                                        #trace = 6, REPORT = 1 
                                        )), 
              error = function(e) { break_opt <<- TRUE})
@@ -44,7 +44,7 @@ opt_path <- function(x_init, fn, gr, N = 25) {
     }
     
     y[n + 1, 1:D] <- z$par
-    y[n + 1, D + 1] <- fn(z$par)
+    y[n + 1, D + 1] <- lp_f(z$par)
     # break if no change in objective
     printf("n = %4d, last = %f;   this = %f",
            n, y[n, D + 1], y[n + 1, D + 1])
@@ -86,7 +86,9 @@ opt_path_stan <- function(model, data, N = 25, init_bound = 2) {
   fn <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
                                  gradient = TRUE)[1]
   gr <- function(theta) grad_log_prob(posterior, theta)
-  out <- opt_path(init, fn, gr, N)
+  lp_f <- function(theta) log_prob(posterior, theta, adjust_transform = FALSE, 
+                                 gradient = TRUE)[1]
+  out <- opt_path(init, fn, gr, N, lp_f)
   return(out)
 }
 
@@ -97,13 +99,15 @@ opt_path_stan_parallel <- function(seed_list, mc.cores,
   fn <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
                                  gradient = TRUE)[1]
   gr <- function(theta) grad_log_prob(posterior, theta)
+  lp_f <- function(theta) log_prob(posterior, theta, adjust_transform = FALSE, 
+                                   gradient = TRUE)[1]
   MC = length(seed_list)
   init = c()
   for(i in 1:MC){
     set.seed(seed_list[i])
     init[[i]] <- runif(D, -init_bound, init_bound)
   }
-  out <- mclapply(init, opt_path, fn = fn, gr = gr, N = N, 
+  out <- mclapply(init, opt_path, fn = fn, gr = gr, N = N, lp_f = lp_f,
                   mc.cores = mc.cores)
 }
 
@@ -121,7 +125,7 @@ params_only <- function(path) {
 
 lp_draws <- function(model, data, init_param_unc) {
   iter <- 1
-  max_treedepth <- 6
+  max_treedepth <- 10
   # stepsize <- 0.005
   posterior <- to_posterior(model, data)
   init_fun <- function(chain_id) constrain_pars(posterior, init_param_unc)
@@ -146,6 +150,7 @@ lp_draws <- function(model, data, init_param_unc) {
   draws <- extract(fit, pars = c("lp__"), permute = FALSE)
   draws[1:iter]
 }
+
 
 increased <- function(lps) {
   # simple comparison of endpoint rather than whole path
@@ -184,8 +189,10 @@ find_typical <- function(param_path, model, data, M = 60) {
     
     increase_prop = increase_counts[1] / (M - increase_counts[2])
     # declare typical if in central 90% interval of random increase/decrease
-    lb = qbinom(0.05, M, 0.5) / M
-    ub = qbinom(0.95, M, 0.5) / M
+    # lb = qbinom(0.05, M, 0.5) / M
+    # ub = qbinom(0.95, M, 0.5) / M
+    lb = qbinom(0.1, M, 0.5) / M
+    ub = qbinom(0.9, M, 0.5) / M
     if (increase_prop >= lb && increase_prop <= ub){
       print(param_path[n, 1:(D + 1)], digits = 2)
       typical_index <- c(typical_index, n)
