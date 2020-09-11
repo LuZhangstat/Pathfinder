@@ -21,7 +21,7 @@ L_pn = length(pn)
 alpha = 0.01
 L = 1000
 M = 20
-width = 860; height = 740 # the size of the plot
+width = 600; height = 500 # the size of the plot
 mc.cores = parallel::detectCores() - 2
 sample_seed = 1234
 
@@ -29,6 +29,8 @@ sample_seed = 1234
 lp_explore_n_iters <- array(data = NA, dim = c(M, L_pn))
 lp_explore_n_leapfrog <- array(data = NA, dim = c(M, L_pn))
 lp_INV <- array(data = NA, dim = c(2, L_pn))
+lp_mean <- c()
+lp_data <- c()
 
 for(l in 1:L_pn){
   modelname <- pn[l]
@@ -48,7 +50,8 @@ for(l in 1:L_pn){
   model <- stan_model(model_code = sc)
   # obtain posterior interval of lp__
   INV <- lp_Int_q_posteriordb(po, alpha)
-  lp_INV[, l] = INV
+  lp_INV[, l] = INV[c(1, 2)]
+  lp_mean[l] = INV[3] 
   ###  run Stan with a long Phase I warmup time  ###
   suppressWarnings(
     phiI_sample <- sampling(model, data = get_data(po), 
@@ -76,24 +79,72 @@ for(l in 1:L_pn){
   
   # check the trace plot of lp__ #
   lp_phI <- ls_lp_phI(phiI_sample, L)
+  L_p = L
+  p_lp_trace = data.frame(iter = rep(1:L_p, M), 
+                          chain = rep(paste(1:M), each = L_p),
+                          lp__ = c(lp_phI[1:L_p, ]))
+  
+  lp_data[[l]] <- p_lp_trace 
+  
+  p_lp_s <- ggplot(data = p_lp_trace, 
+                 aes(x=iter, y=lp__, group=chain, color=chain)) + geom_line() +
+    geom_hline(yintercept = INV[c(1, 2)]) + 
+    geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") + 
+    ylim(INV[1] - 1.5*(INV[2] - INV[1]), INV[2] + 1*(INV[2] - INV[1])) + 
+    ggtitle(paste("model:", modelname)) + theme_bw() 
+  jpeg(filename = paste0("../pics/phI_stan/No",l,"-", modelname, "_s.jpeg"),
+       width = width, height = height, units = "px", pointsize = 12)
+  print(p_lp_s)
+  dev.off()
+  
+  p_lp_L <- ggplot(data = p_lp_trace, 
+                   aes(x=iter, y=lp__, group=chain, color=chain)) + 
+    geom_line() +
+    geom_hline(yintercept = INV[c(1, 2)]) + 
+    geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") + 
+    ggtitle(paste("model:", modelname)) + theme_bw() 
+  jpeg(filename = paste0("../pics/phI_stan/No",l,"-", modelname, "_L.jpeg"),
+       width = width, height = height, units = "px", pointsize = 12)
+  print(p_lp_L)
+  dev.off()
+  
+  p_lp <- ggplot(data = p_lp_trace, 
+                   aes(x=iter, y=lp__, group=chain, color=chain)) + 
+    geom_line() +
+    geom_hline(yintercept = INV[c(1, 2)]) + 
+    geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") +
+    ylim(min(INV[1] - 2*(INV[2] - INV[1]), quantile(p_lp_trace$lp__, 0.05)),
+         max(INV[2] + 1*(INV[2] - INV[1]), max(p_lp_trace$lp__))) + 
+    ggtitle(paste("model:", modelname)) + theme_bw() 
+  jpeg(filename = paste0("../pics/phI_stan/No",l,"-", modelname, ".jpeg"),
+       width = width, height = height, units = "px", pointsize = 12)
+  print(p_lp)
+  dev.off()
+  
   L_p = ifelse((max(lp_explore_sum$n_iters) <= 40), 50, # pick the x-axis range of the plot
                min(as.integer(1.3*max(lp_explore_sum$n_iters)), L))
   p_lp_trace = data.frame(iter = rep(1:L_p, M), 
                           chain = rep(paste(1:M), each = L_p),
                           lp__ = c(lp_phI[1:L_p, ]))
+  
   p_lp <- ggplot(data = p_lp_trace, 
-                 aes(x=iter, y=lp__, group=chain, color=chain)) + geom_line() +
-    geom_hline(yintercept = INV) + ylim(INV[1] - 10*(INV[2] - INV[1]), 
-                                        INV[2] + 2*(INV[2] - INV[1]))
-  jpeg(filename = paste0("../pics/No",l,"-", modelname, "_3.jpeg"),
+                 aes(x=iter, y=lp__, group=chain, color=chain)) + 
+    geom_line() +
+    geom_hline(yintercept = INV[c(1, 2)]) + 
+    geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") +
+    ylim(min(INV[1] - 2*(INV[2] - INV[1]), quantile(p_lp_trace$lp__, 0.15)),
+         max(INV[2] + 1*(INV[2] - INV[1]), max(p_lp_trace$lp__))) + 
+    ggtitle(paste("model:", modelname)) + theme_bw() 
+  jpeg(filename = paste0("../pics/phI_stan/No",l,"-", modelname, "_trun.jpeg"),
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
+  
 }
 
-# save(file = "../results/lp_posteriordb_explore.RData", 
+# save(file = "../results/lp_posteriordb_explore3.RData",
 #      list = c("lp_explore_n_iters", "lp_explore_n_leapfrog",
-#               "lp_INV"))
+#               "lp_INV", "lp_mean", "lp_data"))
 # 
 # load("../results/lp_posteriordb_explore.RData")
 ## check reference posterior ##
