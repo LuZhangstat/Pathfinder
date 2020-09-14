@@ -36,7 +36,7 @@ lp_recover <- function(model, data, pos_draws){
       j = j + n_inits[i]
     }
     log_prob(posterior, unconstrain_pars(posterior, par_template), 
-             adjust_transform = FALSE, gradient = TRUE)[1]
+             adjust_transform = TRUE, gradient = TRUE)[1]
   }
   lpn <- function(gsd_l) apply(sapply(gsd_l, unlist), 1, fn)
   sapply(pos_draws, lpn)

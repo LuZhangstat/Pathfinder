@@ -83,10 +83,10 @@ opt_path_stan <- function(model, data, N = 25, init_bound = 2) {
   posterior <- to_posterior(model, data)
   D <- get_num_upars(posterior)
   init <- runif(D, -init_bound, init_bound)
-  fn <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
+  fn <- function(theta) log_prob(posterior, theta, adjust_transform = FALSE, 
                                  gradient = TRUE)[1]
-  gr <- function(theta) grad_log_prob(posterior, theta)
-  lp_f <- function(theta) log_prob(posterior, theta, adjust_transform = FALSE, 
+  gr <- function(theta) grad_log_prob(posterior, theta, adjust_transform = FALSE)
+  lp_f <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
                                  gradient = TRUE)[1]
   out <- opt_path(init, fn, gr, N, lp_f)
   return(out)
@@ -96,10 +96,10 @@ opt_path_stan_parallel <- function(seed_list, mc.cores,
                                    model, data, N, init_bound){
   posterior <- to_posterior(model, data)
   D <- get_num_upars(posterior)
-  fn <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
+  fn <- function(theta) log_prob(posterior, theta, adjust_transform = FALSE, 
                                  gradient = TRUE)[1]
-  gr <- function(theta) grad_log_prob(posterior, theta)
-  lp_f <- function(theta) log_prob(posterior, theta, adjust_transform = FALSE, 
+  gr <- function(theta) grad_log_prob(posterior, theta, adjust_transform = FALSE)
+  lp_f <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
                                    gradient = TRUE)[1]
   MC = length(seed_list)
   init = c()
