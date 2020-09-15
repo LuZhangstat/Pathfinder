@@ -178,7 +178,7 @@ is_typical <- function(model, data, init_param_unc, M, int_time, lp_0) {
   return(c(increase_count, stuck_count))
 }
 
-find_typical <- function(param_path, model, data, M = 20, int_time = 2) {
+find_typical <- function(param_path, model, data, M = 4, int_time = 6) {
   typical_index <- c()          # return the index of sample in param_path that is identified as a good initial
   N <- dim(param_path)[1]
   D <- dim(param_path)[2] - 1   # includes objective in last position
@@ -196,8 +196,8 @@ find_typical <- function(param_path, model, data, M = 20, int_time = 2) {
     # declare typical if in central 90% interval of random increase/decrease
     # lb = qbinom(0.05, M, 0.5) / M
     # ub = qbinom(0.95, M, 0.5) / M
-    lb = qbinom(0.3, (M * int_time), 0.5) / (M * int_time)
-    ub = qbinom(0.7, (M * int_time), 0.5) / (M * int_time)
+    lb = qbinom(0.1, (M * int_time), 0.5) / (M * int_time)
+    ub = qbinom(0.9, (M * int_time), 0.5) / (M * int_time)
     if (increase_prop >= lb && increase_prop <= ub){
       print(param_path[n, 1:(D + 1)], digits = 2)
       typical_index <- c(typical_index, n)
