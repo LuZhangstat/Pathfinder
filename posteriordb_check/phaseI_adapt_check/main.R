@@ -11,7 +11,8 @@ rstan_options(auto_write = TRUE)
 library(posteriordb)
 library(posterior)
 library(ggplot2)
-source("../utils/sim.R")
+#source("../utils/sim.R")
+source("../utils/sim_H.R")
 source("../utils/lp_utils.R")
 
 set.seed(123)
@@ -27,6 +28,7 @@ MC = mc.cores    # 10 iterations
 init_bound = 2
 width = 600; height = 500 # the size of the plot
 seed_list = 1:MC
+takeoff <- c(21, 24)
 
 ## setting 1 ##
 # iter <- 2
@@ -70,34 +72,44 @@ seed_list = 1:MC
 # max_treedepth <- 10
 # stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2
 
+##setting 7 ##
+# hamiltonian dynamic
+# M = 4
+# int_time = 6
+# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2
+# lb = qbinom(0.1, (M * int_time), 0.5) / (M * int_time)
+# ub = qbinom(0.9, (M * int_time), 0.5) / (M * int_time)
+
+# N_models = 0
+# model_record = c()
+# for(l in 1:L_pn){
+#   if(any(l == takeoff)){next}
+#   modelname <- pn[l]
+#   
+#   # pick model
+#   po <- posterior(modelname, pdb = pd)
+#   # get reference posterior samples
+#   skip_to_next <- FALSE
+#   tryCatch(gsd <- reference_posterior_draws(po),
+#            error = function(e) { skip_to_next <<- TRUE})
+#   if(skip_to_next) {
+#     # print("Error in obtaining reference posterior for this posterior.")
+#     next }
+#   N_models = N_models + 1
+#   model_record = c(model_record, l)
+#   printf("model %d: %s", l, modelname)
+# }
+# N_models
+
+model_record <- c(1, 2, 3, 4, 6, 8, 11, 13, 15, 20, 23, 25, 26, 27, 29, 31, 33,
+                  34, 36, 37, 40, 41, 43, 47, 51, 55, 61, 94, 95)
+N_models <- length(model_record)
 
 
 # preallocate results #
-lp_INV <- array(data = NA, dim = c(2, L_pn))
+lp_INV <- array(data = NA, dim = c(2, length(model_record)))
 lp_mean <- c()
 lp_opath <- c()
-takeoff <- c(21, 24)
-
-N_models = 0
-model_record = c()
-for(l in 1:L_pn){
-  if(any(l == takeoff)){next}
-  modelname <- pn[l]
-  
-  # pick model
-  po <- posterior(modelname, pdb = pd)
-  # get reference posterior samples
-  skip_to_next <- FALSE
-  tryCatch(gsd <- reference_posterior_draws(po),
-           error = function(e) { skip_to_next <<- TRUE})
-  if(skip_to_next) {
-    # print("Error in obtaining reference posterior for this posterior.")
-    next }
-  N_models = N_models + 1
-  model_record = c(model_record, l)
-  printf("model %d: %s", l, modelname)
-}
-N_models
 
 for(i in 1:length(model_record)){
   modelname <- pn[model_record[i]]
@@ -125,15 +137,16 @@ for(i in 1:length(model_record)){
   lp_opath[[i]] <- list(opath = opath, pick_ind = pick_ind)
 }
 
-test_ind <- find_typical(opath[[9]], model, data)
+test_ind <- find_typical(opath[[3]], model, data)
 opath[[9]][test_ind, ncol(opath[[9]])]
-init_param_unc <- opath[[9]][1, -ncol(opath[[9]])]
+init_param_unc <- opath[[1]][18, -ncol(opath[[1]])]
+opath[[1]][18, ncol(opath[[1]])]
 # tt <- get_sampler_params(fit_0)
 # tt2 <- unlist(sapply(opath2, f <- function(x){ x[ , ncol(x)]}))
 # hist(tt2[tt2>-2000])
 
-# save(file = "../results/lp_posteriordb_phI_adapt_set6.RData",
-#      list = c("lp_opath", "lp_INV", "model_record"))
+save(file = "../results/lp_posteriordb_phI_adapt_set7.RData",
+     list = c("lp_opath", "lp_INV", "model_record"))
 
 
 # load("../results/lp_posteriordb_phI_adapt_set2.RData")
