@@ -34,7 +34,7 @@ opt_path <- function(x_init, fn, gr, N = 25, lp_f) {
                         fn = function(x) -fn(x),  # negate for maximization
                         gr = function(x) -gr(x),
                         method = "L-BFGS-B",
-                        control = list(maxit = n, factr = 1e10#, ndeps = 1e-8 #, 
+                        control = list(maxit = n#, factr = 1e10#, ndeps = 1e-8 #, 
                                        #trace = 6, REPORT = 1 
                                        )), 
              error = function(e) { break_opt <<- TRUE})
