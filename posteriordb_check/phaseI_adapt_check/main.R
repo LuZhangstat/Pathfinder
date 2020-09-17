@@ -12,7 +12,7 @@ library(posteriordb)
 library(posterior)
 library(ggplot2)
 #source("../utils/sim.R")
-source("../utils/sim_H.R")
+source("../utils/sim_H2.R")
 source("../utils/lp_utils.R")
 
 set.seed(123)
@@ -28,7 +28,7 @@ MC = mc.cores    # 10 iterations
 init_bound = 2
 width = 600; height = 500 # the size of the plot
 seed_list = 1:MC
-takeoff <- c(21, 24)
+#takeoff <- c(21, 24)
 
 ## setting 1 ##
 # iter <- 2
@@ -79,6 +79,10 @@ takeoff <- c(21, 24)
 # stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2
 # lb = qbinom(0.1, (M * int_time), 0.5) / (M * int_time)
 # ub = qbinom(0.9, (M * int_time), 0.5) / (M * int_time)
+
+##setting 8##
+# sim_H2
+# int_time = 30
 
 # N_models = 0
 # model_record = c()
@@ -137,15 +141,15 @@ for(i in 1:length(model_record)){
   lp_opath[[i]] <- list(opath = opath, pick_ind = pick_ind)
 }
 
-test_ind <- find_typical(opath[[3]], model, data)
+test_ind <- find_typical(opath[[10]], model, data)
 opath[[9]][test_ind, ncol(opath[[9]])]
-init_param_unc <- opath[[1]][18, -ncol(opath[[1]])]
-opath[[1]][18, ncol(opath[[1]])]
+init_param_unc <- opath[[1]][12, -ncol(opath[[1]])]
+opath[[3]][39, ncol(opath[[1]])]
 # tt <- get_sampler_params(fit_0)
 # tt2 <- unlist(sapply(opath2, f <- function(x){ x[ , ncol(x)]}))
 # hist(tt2[tt2>-2000])
 
-save(file = "../results/lp_posteriordb_phI_adapt_set7.RData",
+save(file = "../results/lp_posteriordb_phI_adapt_set8.RData",
      list = c("lp_opath", "lp_INV", "model_record"))
 
 
@@ -257,7 +261,7 @@ for(i in 1:length(model_record)){
 ##No: 3: bball_drive_event_0-hmm_drive_0 # multimodel. Also need checking
 ##No: 41: mcycle_gp-accel_gp           ## Not very good
 
-i = which(model_record == 55)
+i = which(model_record == 23)
 p_lp <- ggplot(data = p_lp_trace, 
                aes(x=iter, y=lp__, group=chain, color=label)) +
   geom_line(colour = "grey") + geom_point(size = 1) + 
