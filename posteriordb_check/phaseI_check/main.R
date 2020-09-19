@@ -25,33 +25,51 @@ width = 600; height = 500 # the size of the plot
 mc.cores = parallel::detectCores() - 2
 sample_seed = 1234
 
-# preallocate results #
-lp_explore_n_iters <- array(data = NA, dim = c(M, L_pn))
-lp_explore_n_leapfrog <- array(data = NA, dim = c(M, L_pn))
-lp_INV <- array(data = NA, dim = c(2, L_pn))
-lp_mean <- c()
-lp_data <- c()
-
+# pick models #
+takeoff <- c(21, 24)
+N_models = 0
+model_record = c()
 for(l in 1:L_pn){
+  if(any(l == takeoff)){next}
   modelname <- pn[l]
-  printf("model %d: %s", l, modelname)
+  
   # pick model
   po <- posterior(modelname, pdb = pd)
   # get reference posterior samples
   skip_to_next <- FALSE
-  tryCatch(gsd <- reference_posterior_draws(po), 
+  tryCatch(gsd <- reference_posterior_draws(po),
            error = function(e) { skip_to_next <<- TRUE})
-  if(skip_to_next) { 
-    print("Error in obtaining reference posterior for this posterior.")
-    next }  
+  if(skip_to_next) {
+    # print("Error in obtaining reference posterior for this posterior.")
+    next }
+  N_models = N_models + 1
+  model_record = c(model_record, l)
+  printf("model %d: %s", l, modelname)
+}
+N_models
+
+# preallocate results #
+lp_explore_n_iters <- array(data = NA, dim = c(M, length(model_record)))
+lp_explore_n_leapfrog <- array(data = NA, dim = c(M, length(model_record)))
+lp_INV <- array(data = NA, dim = c(2, length(model_record)))
+lp_mean <- c()
+lp_data <- c()
+
+for(i in 1:length(model_record)){
+  modelname <- pn[model_record[i]]
+  printf("model %d: %s", model_record[i], modelname)
+  # pick model
+  po <- posterior(modelname, pdb = pd)
+  # get reference posterior samples
+  gsd <- reference_posterior_draws(po)
   
   # compile the model
   sc <- stan_code(po)
   model <- stan_model(model_code = sc)
   # obtain posterior interval of lp__
   INV <- lp_Int_q_posteriordb(po, alpha)
-  lp_INV[, l] = INV[c(1, 2)]
-  lp_mean[l] = INV[3] 
+  lp_INV[, i] = INV[c(1, 2)]
+  lp_mean[i] = INV[3] 
   ###  run Stan with a long Phase I warmup time  ###
   suppressWarnings(
     phiI_sample <- sampling(model, data = get_data(po), 
@@ -70,8 +88,8 @@ for(l in 1:L_pn){
   ###  record the number of iterations required to reach INV ###
   # Get the number of iterations and  leapfrogs #
   lp_explore_sum <- lp_explore(phiI_sample, INV, L, M)
-  lp_explore_n_iters[, l] = lp_explore_sum$n_iters
-  lp_explore_n_leapfrog[, l] = lp_explore_sum$n_sum_leapfrog
+  lp_explore_n_iters[, i] = lp_explore_sum$n_iters
+  lp_explore_n_leapfrog[, i] = lp_explore_sum$n_sum_leapfrog
   printf("the maximum iter to reach %.1f %% posterior interval of lp__ is %d",
         (1.0 - alpha) * 100, max(lp_explore_sum$n_iters))
   printf("the average leapfrogs is %.2f, sd is %.2f", 
@@ -84,7 +102,7 @@ for(l in 1:L_pn){
                           chain = rep(paste(1:M), each = L_p),
                           lp__ = c(lp_phI[1:L_p, ]))
   
-  lp_data[[l]] <- p_lp_trace 
+  lp_data[[i]] <- p_lp_trace 
   
   p_lp_s <- ggplot(data = p_lp_trace, 
                  aes(x=iter, y=lp__, group=chain, color=chain)) + geom_line() +
@@ -92,7 +110,8 @@ for(l in 1:L_pn){
     geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") + 
     ylim(INV[1] - 1.5*(INV[2] - INV[1]), INV[2] + 1*(INV[2] - INV[1])) + 
     ggtitle(paste("model:", modelname)) + theme_bw() 
-  jpeg(filename = paste0("../pics/phI_stan/No",l,"-", modelname, "_s.jpeg"),
+  jpeg(filename = paste0("../pics/phI_stan/No", model_record[i], "-", 
+                         modelname, "_s.jpeg"),
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp_s)
   dev.off()
@@ -103,7 +122,8 @@ for(l in 1:L_pn){
     geom_hline(yintercept = INV[c(1, 2)]) + 
     geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") + 
     ggtitle(paste("model:", modelname)) + theme_bw() 
-  jpeg(filename = paste0("../pics/phI_stan/No",l,"-", modelname, "_L.jpeg"),
+  jpeg(filename = paste0("../pics/phI_stan/No", model_record[i], "-", 
+                         modelname, "_L.jpeg"),
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp_L)
   dev.off()
@@ -116,7 +136,8 @@ for(l in 1:L_pn){
     ylim(min(INV[1] - 2*(INV[2] - INV[1]), quantile(p_lp_trace$lp__, 0.05)),
          max(INV[2] + 1*(INV[2] - INV[1]), max(p_lp_trace$lp__))) + 
     ggtitle(paste("model:", modelname)) + theme_bw() 
-  jpeg(filename = paste0("../pics/phI_stan/No",l,"-", modelname, ".jpeg"),
+  jpeg(filename = paste0("../pics/phI_stan/No", model_record[i], "-", 
+                         modelname, ".jpeg"),
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
@@ -135,7 +156,8 @@ for(l in 1:L_pn){
     ylim(min(INV[1] - 2*(INV[2] - INV[1]), quantile(p_lp_trace$lp__, 0.15)),
          max(INV[2] + 1*(INV[2] - INV[1]), max(p_lp_trace$lp__))) + 
     ggtitle(paste("model:", modelname)) + theme_bw() 
-  jpeg(filename = paste0("../pics/phI_stan/No",l,"-", modelname, "_trun.jpeg"),
+  jpeg(filename = paste0("../pics/phI_stan/No", model_record[i], "-", 
+                         modelname, "_trun.jpeg"),
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
