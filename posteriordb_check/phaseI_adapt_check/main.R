@@ -141,15 +141,15 @@ for(i in 1:length(model_record)){
   lp_opath[[i]] <- list(opath = opath, pick_ind = pick_ind)
 }
 
-test_ind <- find_typical(opath[[10]], model, data)
+test_ind <- find_typical(opath[[4]], model, data)
 opath[[9]][test_ind, ncol(opath[[9]])]
-init_param_unc <- opath[[1]][12, -ncol(opath[[1]])]
+init_param_unc <- opath[[1]][22, -ncol(opath[[1]])]
 opath[[3]][39, ncol(opath[[1]])]
 # tt <- get_sampler_params(fit_0)
 # tt2 <- unlist(sapply(opath2, f <- function(x){ x[ , ncol(x)]}))
 # hist(tt2[tt2>-2000])
 
-save(file = "../results/lp_posteriordb_phI_adapt_set8.RData",
+save(file = "../results/lp_posteriordb_phI_adapt_set9.RData",
      list = c("lp_opath", "lp_INV", "model_record"))
 
 
@@ -261,7 +261,7 @@ for(i in 1:length(model_record)){
 ##No: 3: bball_drive_event_0-hmm_drive_0 # multimodel. Also need checking
 ##No: 41: mcycle_gp-accel_gp           ## Not very good
 
-i = which(model_record == 23)
+i = which(model_record == 3)
 p_lp <- ggplot(data = p_lp_trace, 
                aes(x=iter, y=lp__, group=chain, color=label)) +
   geom_line(colour = "grey") + geom_point(size = 1) + 
