@@ -13,7 +13,7 @@ library(posterior)
 library(ggplot2)
 library(gridExtra)
 #source("../utils/sim.R")
-source("../utils/sim_H_draw.R")
+source("../utils/sim_H3_draw.R")
 source("../utils/lp_utils.R")
 
 set.seed(123)
@@ -150,11 +150,11 @@ opath[[3]][39, ncol(opath[[1]])]
 # tt2 <- unlist(sapply(opath2, f <- function(x){ x[ , ncol(x)]}))
 # hist(tt2[tt2>-2000])
 
-# save(file = "../results/lp_posteriordb_phI_adapt_set9.RData",
+# save(file = "../results/lp_posteriordb_phI_adapt_H3_draw.RData",
 #      list = c("lp_opath", "lp_INV", "model_record"))
 
 
-# load("../results/lp_posteriordb_phI_adapt_set2.RData")
+# load("../results/lp_posteriordb_phI_adapt_H3_draw.RData")
 
 ## check the plots ##
 for(i in 1:length(model_record)){
@@ -194,13 +194,15 @@ for(i in 1:length(model_record)){
     geom_hline(yintercept = lp_INV[, i], colour = "black") + 
     geom_hline(yintercept = lp_mean[i], colour = "blue", linetype = 2)+
     ylim(#min(p_lp_trace$lp__)
-         #lp_INV[1, i] - 1.5*(lp_INV[2, i] - lp_INV[1, i])
-         min(lp_INV[1, i] - (lp_INV[2, i] - lp_INV[1, i]),
-                quantile(p_lp_trace$lp__, 0.2))
+         lp_INV[1, i] - 1.5*(lp_INV[2, i] - lp_INV[1, i])
+         # min(lp_INV[1, i] - (lp_INV[2, i] - lp_INV[1, i]),
+         #        quantile(p_lp_trace$lp__, 0.2))
          ,
          max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
              max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
     theme_bw(base_size = 16) 
+  
+  if(is.null(unlist(lp_opath[[i]]$pick_records[[1]]$record_lp_draws))){next}
   
   p_lp_trace_2 = 
     data.frame(
@@ -229,7 +231,8 @@ for(i in 1:length(model_record)){
   labels <- sapply(1:nrow(lp_opath[[i]]$opath[[1]]), 
                    f <- function(x){
                      paste0(x, " stepsize:", 
-                           lp_opath[[i]]$pick_records[[1]]$record_stepsize[[x]])
+                           round(lp_opath[[i]]$pick_records[[1]]$record_stepsize[[x]],
+                                 digits = 6))
                    })
   p_lp_trace_2$point_id <- 
     factor(p_lp_trace_2$point_id, levels = 1:nrow(lp_opath[[i]]$opath[[1]]),
@@ -242,8 +245,8 @@ for(i in 1:length(model_record)){
     theme_bw(base_size = 16) + ylab("unconstrained lp pathes") + 
     xlab("path iteration") 
   
-  jpeg(filename = paste0("../pics/phI_adapt_H_path/No", model_record[i], "-", 
-                         modelname, ".jpeg"), #model_record[i]
+  jpeg(filename = paste0("../pics/phI_adapt_H3_path/No", model_record[i], "-", 
+                         modelname, "_s.jpeg"), #model_record[i]
        width = 1000, height = 900, units = "px", pointsize = 12)
   lay <- rbind(c(1,1,1,1,1),
                c(1,1,1,1,1),
@@ -270,7 +273,7 @@ for(i in 1:length(model_record)){
 ##No: 3: bball_drive_event_0-hmm_drive_0 # multimodel. Also need checking
 ##No: 41: mcycle_gp-accel_gp           ## Not very good
 
-i = which(model_record == 3)
+i = which(model_record == 47)
 p_lp <- ggplot(data = p_lp_trace, 
                aes(x=iter, y=lp__, group=chain, color=label)) +
   geom_line(colour = "grey") + geom_point(size = 1) + 

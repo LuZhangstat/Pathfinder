@@ -12,7 +12,7 @@ library(posteriordb)
 library(posterior)
 library(ggplot2)
 #source("../utils/sim.R")
-source("../utils/sim_H3.R")
+source("../utils/sim_H5.R")
 source("../utils/lp_utils.R")
 
 set.seed(123)
@@ -22,88 +22,21 @@ L_pn = length(pn)
 
 # parameters settings #
 alpha = 0.01
-N = 60    # Maximum iters in optimization
+N1 = 30    # Maximum iters in optimization
+N1_2 = 30
+N_rep = 10
 mc.cores = parallel::detectCores() - 2
 MC = mc.cores    # 10 iterations
+MC = 3
 init_bound = 2
 width = 600; height = 500 # the size of the plot
 seed_list = 1:MC
-#takeoff <- c(21, 24)
 
-## setting 1 ##
-# iter <- 2
-# max_treedepth <- 3
-# stepsize <- 0.005
-# M = 20
+##setting 9##
+# sim_H4
 
-## setting 2 larger treedepth##
-# iter <- 2
-# max_treedepth <- 5
-# stepsize <- 0.005
-# M = 40
-# N = 100
-
-## setting 3 adapt stepsize##
-# iter <- 3
-# max_treedepth <- 4
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2^2
-# M = 60
-# N = 100
-
-## setting 4 adapt stepsize##
-# iter <- 1
-# max_treedepth <- 6
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 3*2
-# M = 60
-# N = 60
-# 50% Center interval
-
-## setting 5 adapt stepsize##
-# iter <- 1
-# max_treedepth <- 6
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 3*2
-# M = 60
-# N = 60
-# 80% Center interval
-
-
-##setting 6 ##
-# iter <- 1
-# max_treedepth <- 10
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2
-
-##setting 7 ##
-# hamiltonian dynamic
-# M = 4
-# int_time = 6
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2
-# lb = qbinom(0.1, (M * int_time), 0.5) / (M * int_time)
-# ub = qbinom(0.9, (M * int_time), 0.5) / (M * int_time)
-
-##setting 8##
-# sim_H2
-# int_time = 30
-
-# N_models = 0
-# model_record = c()
-# for(l in 1:L_pn){
-#   if(any(l == takeoff)){next}
-#   modelname <- pn[l]
-#   
-#   # pick model
-#   po <- posterior(modelname, pdb = pd)
-#   # get reference posterior samples
-#   skip_to_next <- FALSE
-#   tryCatch(gsd <- reference_posterior_draws(po),
-#            error = function(e) { skip_to_next <<- TRUE})
-#   if(skip_to_next) {
-#     # print("Error in obtaining reference posterior for this posterior.")
-#     next }
-#   N_models = N_models + 1
-#   model_record = c(model_record, l)
-#   printf("model %d: %s", l, modelname)
-# }
-# N_models
+##setting 10##
+# sim_H5
 
 model_record <- c(1, 2, 3, 4, 6, 8, 11, 13, 15, 20, 23, 25, 26, 27, 29, 31, 33,
                   34, 36, 37, 40, 41, 43, 47, 51, 55, 61, 94, 95)
@@ -133,11 +66,14 @@ for(i in 1:length(model_record)){
   lp_mean[i] = INV[3]
   ###  run Bob's Phase I  ###
   data <- get_data(po)
-  opath <- opt_path_stan_parallel(seed_list, mc.cores, 
-                                  model, data, N, init_bound)
-  pick_ind <- mclapply(opath, find_typical, model = model, 
-                       data = data, mc.cores = mc.cores) 
   
+  #opt_path_stan(model, data, N1 = 30, N_rep = 6, init_bound = 2)
+  
+  opath <- opt_path_stan_parallel(seed_list, mc.cores, 
+                                  model, data, N1, N1_2, N_rep, init_bound)
+  # pick_ind <- mclapply(opath, find_typical, model = model, 
+  #                      data = data, mc.cores = mc.cores) 
+  pick_ind <- lapply(opath, f <- function(x){c(0)})
   lp_opath[[i]] <- list(opath = opath, pick_ind = pick_ind)
 }
 
@@ -200,7 +136,7 @@ for(i in 1:length(model_record)){
              max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
     theme_bw() 
   
-  jpeg(filename = paste0("../pics/phI_adapt/No", model_record[i], "-", 
+  jpeg(filename = paste0("../pics/phI_adapt_setting9/No", model_record[i], "-", 
                          modelname, "_L.jpeg"), #model_record[i]
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
@@ -220,7 +156,7 @@ for(i in 1:length(model_record)){
              max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
     theme_bw() 
   
-  jpeg(filename = paste0("../pics/phI_adapt/No", model_record[i], "-", 
+  jpeg(filename = paste0("../pics/phI_adapt_setting9/No", model_record[i], "-", 
                          modelname, "_s.jpeg"), #model_record[i]
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
@@ -240,7 +176,7 @@ for(i in 1:length(model_record)){
              max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
     theme_bw() 
   
-  jpeg(filename = paste0("../pics/phI_adapt/No", model_record[i], "-", 
+  jpeg(filename = paste0("../pics/phI_adapt_setting9/No", model_record[i], "-", 
                          modelname, "_trun.jpeg"), #model_record[i]
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
@@ -261,7 +197,7 @@ for(i in 1:length(model_record)){
 ##No: 3: bball_drive_event_0-hmm_drive_0 # multimodel. Also need checking
 ##No: 41: mcycle_gp-accel_gp           ## Not very good
 
-i = which(model_record == 55)
+i = which(model_record == 20)
 p_lp <- ggplot(data = p_lp_trace, 
                aes(x=iter, y=lp__, group=chain, color=label)) +
   geom_line(colour = "grey") + geom_point(size = 1) + 

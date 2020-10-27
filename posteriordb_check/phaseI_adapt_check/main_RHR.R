@@ -11,10 +11,9 @@ rstan_options(auto_write = TRUE)
 library(posteriordb)
 library(posterior)
 library(ggplot2)
-library(gridExtra)
-#source("../utils/sim.R")
-source("../utils/sim_H3.R")
+source("../utils/sim_RHR.R")
 source("../utils/lp_utils.R")
+source("../utils/L_RHR.R")
 
 set.seed(123)
 pd <- pdb_local() # Posterior database connection
@@ -23,88 +22,18 @@ L_pn = length(pn)
 
 # parameters settings #
 alpha = 0.01
-N = 40    # Maximum iters in optimization
-mc.cores = 1 #parallel::detectCores() - 2
+N1 = 60    # Maximum iters in optimization
+N_mode_max = 20 
+N_sam = 100
+mc.cores = parallel::detectCores() - 2
 MC = mc.cores    # 10 iterations
+MC = 3
 init_bound = 2
 width = 600; height = 500 # the size of the plot
 seed_list = 1:MC
-#takeoff <- c(21, 24)
-
-## setting 1 ##
-# iter <- 2
-# max_treedepth <- 3
-# stepsize <- 0.005
-# M = 20
-
-## setting 2 larger treedepth##
-# iter <- 2
-# max_treedepth <- 5
-# stepsize <- 0.005
-# M = 40
-# N = 100
-
-## setting 3 adapt stepsize##
-# iter <- 3
-# max_treedepth <- 4
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2^2
-# M = 60
-# N = 100
-
-## setting 4 adapt stepsize##
-# iter <- 1
-# max_treedepth <- 6
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 3*2
-# M = 60
-# N = 60
-# 50% Center interval
-
-## setting 5 adapt stepsize##
-# iter <- 1
-# max_treedepth <- 6
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 3*2
-# M = 60
-# N = 60
-# 80% Center interval
 
 
-##setting 6 ##
-# iter <- 1
-# max_treedepth <- 10
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2
-
-##setting 7 ##
-# hamiltonian dynamic
-# M = 4
-# int_time = 6
-# stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"] / 2
-# lb = qbinom(0.1, (M * int_time), 0.5) / (M * int_time)
-# ub = qbinom(0.9, (M * int_time), 0.5) / (M * int_time)
-
-##setting 8##
-# sim_H2
-# int_time = 30
-
-# N_models = 0
-# model_record = c()
-# for(l in 1:L_pn){
-#   if(any(l == takeoff)){next}
-#   modelname <- pn[l]
-#   
-#   # pick model
-#   po <- posterior(modelname, pdb = pd)
-#   # get reference posterior samples
-#   skip_to_next <- FALSE
-#   tryCatch(gsd <- reference_posterior_draws(po),
-#            error = function(e) { skip_to_next <<- TRUE})
-#   if(skip_to_next) {
-#     # print("Error in obtaining reference posterior for this posterior.")
-#     next }
-#   N_models = N_models + 1
-#   model_record = c(model_record, l)
-#   printf("model %d: %s", l, modelname)
-# }
-# N_models
+##setting 11##
 
 model_record <- c(1, 2, 3, 4, 6, 8, 11, 13, 15, 20, 23, 25, 26, 27, 29, 31, 33,
                   34, 36, 37, 40, 41, 43, 47, 51, 55, 61, 94, 95)
@@ -116,7 +45,7 @@ lp_INV <- array(data = NA, dim = c(2, length(model_record)))
 lp_mean <- c()
 lp_opath <- c()
 
-for(i in 1:length(model_record)){
+for(i in 1:length(model_record)){ #
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   
@@ -134,15 +63,16 @@ for(i in 1:length(model_record)){
   lp_mean[i] = INV[3]
   ###  run Bob's Phase I  ###
   data <- get_data(po)
-  opath <- opt_path_stan_parallel(seed_list, mc.cores, 
-                                  model, data, N, init_bound)
-  pick_records <- mclapply(opath, find_typical, model = model, 
-                       data = data, mc.cores = mc.cores) 
   
-  lp_opath[[i]] <- list(opath = opath, pick_records = pick_records)
+  #opt_path_stan(model, data, N1 = 30, N_rep = 6, init_bound = 2)
+  opath <- opt_path_stan_parallel(seed_list, mc.cores, model, data, 
+                                  N1, N_mode_max, N_sam, init_bound)
+  pick_ind <- mclapply(opath, find_indx, mc.cores = mc.cores)
+  lp_opath[[i]] <- list(opath = opath, pick_ind = pick_ind)
 }
 
-test_ind <- find_typical(opath[[4]], model, data)
+param_path <- opath[[1]]
+test_ind <- find_typical(opath[[1]], model, data)
 opath[[9]][test_ind, ncol(opath[[9]])]
 init_param_unc <- opath[[1]][22, -ncol(opath[[1]])]
 opath[[3]][39, ncol(opath[[1]])]
@@ -150,44 +80,44 @@ opath[[3]][39, ncol(opath[[1]])]
 # tt2 <- unlist(sapply(opath2, f <- function(x){ x[ , ncol(x)]}))
 # hist(tt2[tt2>-2000])
 
-save(file = "../results/lp_posteriordb_phI_adapt_set9.RData",
-     list = c("lp_opath", "lp_INV", "model_record"))
+# save(file = "../results/lp_posteriordb_phI_adapt_set9.RData",
+#      list = c("lp_opath", "lp_INV", "model_record"))
 
 
-# load("../results/lp_posteriordb_phI_adapt_set2.RData")
+# load("../results/lp_posteriordb_phI_adapt_set9.RData")
 
 ## check the plots ##
-for(i in 1:length(model_record)){
+for(i in 1:length(model_record)){ #
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   #i = model_record[i]
   Lp_list = unlist(sapply(lp_opath[[i]]$opath, 
                           f <- function(x){
-                            if(is.vector(x)){
-                              return(1)
-                            }else if(is.null(dim(x))){
+                            if(length(x) == 1){
                               return(NA)
-                            }else{return(nrow(x))}}))
+                            }else if(is.vector(x$y)){
+                              return(1)
+                            }else{return(nrow(x$y))}}))
   chain_id = (1:MC)[!is.na(Lp_list)]
   p_lp_trace = 
     data.frame(iter = c(unlist(sapply(chain_id, f <- function(x){1:Lp_list[x]}))), 
                lp__ = c(unlist(sapply(lp_opath[[i]]$opath[chain_id], 
-                                      f <- function(x){if(is.null(dim(x))){
-                                        return(x[length(x)])
-                                      }else{ return(x[, ncol(x)])}}))),
+                                      f <- function(x){if(is.null(dim(x$y))){
+                                        return(x$y[length(x$y)])
+                                      }else{ return(x$y[, ncol(x$y)])}}))),
                chain = c(unlist(sapply(chain_id, f <- function(x){rep(x, Lp_list[x])}))),
                label = c(unlist(sapply(chain_id, f <- function(x){
                  if(Lp_list[x] == 1){
                    out = c("point on optim path")
                  } else{
                    out = rep("point on optim path", Lp_list[x])
-                   out[lp_opath[[i]]$pick_records[[x]]$typical_index] = "marked point"
+                   out[lp_opath[[i]]$pick_ind[[x]]] = "marked point"
                    if(length(out) > Lp_list[x]){
                      out = rep("point on optim path", Lp_list[x]) # error in HMC sampling
                    }} 
                  return(out)}))))
   
-  p_lp1 <- ggplot(data = p_lp_trace, 
+  p_lp <- ggplot(data = p_lp_trace, 
                  aes(x=iter, y=lp__, group=chain, color=label)) +
     geom_line(colour = "grey") + geom_point(size = 2) + 
     geom_hline(yintercept = lp_INV[, i], colour = "black") + 
@@ -198,10 +128,24 @@ for(i in 1:length(model_record)){
        #        quantile(p_lp_trace$lp__, 0.2))
       ,
          max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
-             max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
+             max(p_lp_trace$lp__))) + 
+    ggtitle(paste("model:", modelname,"\n", "estimated E(lp):", 
+                  paste(sapply(lp_opath[[i]]$opath[chain_id], 
+                         f <- function(x){ 
+                           if(is.null(x$E_lp[length(x$E_lp)])){"NULL"}else{
+                             round(x$E_lp[length(x$E_lp)], digits = 1)
+                           }}), 
+                        collapse = " "), 
+                  "VS E(lp):", round(lp_mean[i], digits = 1)))+
     theme_bw() 
   
-  p_lp2 <- ggplot(data = p_lp_trace, 
+  jpeg(filename = paste0("../pics/phI_adapt_setting11/No", model_record[i], "-", 
+                         modelname, "_L.jpeg"), #model_record[i]
+       width = width, height = height, units = "px", pointsize = 12)
+  print(p_lp)
+  dev.off()
+  
+  p_lp <- ggplot(data = p_lp_trace, 
                  aes(x=iter, y=lp__, group=chain, color=label)) +
     geom_line(colour = "grey") + geom_point(size = 2) + 
     geom_hline(yintercept = lp_INV[, i], colour = "black") + 
@@ -212,10 +156,24 @@ for(i in 1:length(model_record)){
          #        quantile(p_lp_trace$lp__, 0.2))
          ,
          max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
-             max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
+             max(p_lp_trace$lp__))) + 
+    ggtitle(paste("model:", modelname, "\n", "estimated E(lp):", 
+                  paste(sapply(lp_opath[[i]]$opath[chain_id], 
+                               f <- function(x){ 
+                                 if(is.null(x$E_lp[length(x$E_lp)])){"NULL"}else{
+                                   round(x$E_lp[length(x$E_lp)], digits = 1)
+                                 }}), 
+                        collapse = " "), 
+                  "VS E(lp):", round(lp_mean[i], digits = 1)))+
     theme_bw() 
   
-  p_lp3 <- ggplot(data = p_lp_trace, 
+  jpeg(filename = paste0("../pics/phI_adapt_setting11/No", model_record[i], "-", 
+                         modelname, "_s.jpeg"), #model_record[i]
+       width = width, height = height, units = "px", pointsize = 12)
+  print(p_lp)
+  dev.off()
+  
+  p_lp <- ggplot(data = p_lp_trace, 
                  aes(x=iter, y=lp__, group=chain, color=label)) +
     geom_line(colour = "grey") + geom_point(size = 2) + 
     geom_hline(yintercept = lp_INV[, i], colour = "black") + 
@@ -226,13 +184,21 @@ for(i in 1:length(model_record)){
                 quantile(p_lp_trace$lp__, 0.2))
          ,
          max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
-             max(p_lp_trace$lp__))) + ggtitle(paste("model:", modelname))+
+             max(p_lp_trace$lp__))) + 
+    ggtitle(paste("model:", modelname, "\n", "estimated E(lp):", 
+                  paste(sapply(lp_opath[[i]]$opath[chain_id], 
+                               f <- function(x){ 
+                                 if(is.null(x$E_lp[length(x$E_lp)])){"NULL"}else{
+                                   round(x$E_lp[length(x$E_lp)], digits = 1)
+                                 }}), 
+                        collapse = " "), 
+                  "VS E(lp):", round(lp_mean[i], digits = 1)))+
     theme_bw() 
   
-  jpeg(filename = paste0("../pics/phI_adapt/No", model_record[i], "-", 
-                         modelname, ".jpeg"), #model_record[i]
-       width = width*3, height = height, units = "px", pointsize = 12)
-  grid.arrange(p_lp1, p_lp2, p_lp3, nrow = 1)
+  jpeg(filename = paste0("../pics/phI_adapt_setting11/No", model_record[i], "-", 
+                         modelname, "_trun.jpeg"), #model_record[i]
+       width = width, height = height, units = "px", pointsize = 12)
+  print(p_lp)
   dev.off()
   
 }
@@ -250,7 +216,7 @@ for(i in 1:length(model_record)){
 ##No: 3: bball_drive_event_0-hmm_drive_0 # multimodel. Also need checking
 ##No: 41: mcycle_gp-accel_gp           ## Not very good
 
-i = which(model_record == 3)
+i = which(model_record == 20)
 p_lp <- ggplot(data = p_lp_trace, 
                aes(x=iter, y=lp__, group=chain, color=label)) +
   geom_line(colour = "grey") + geom_point(size = 1) + 
@@ -264,4 +230,19 @@ p_lp
 ## errors in finding optimization path
 ## divergents in the MCMC sampling, stepsize
 ## slow
+
+# > lp_INV[2, ] - lp_INV[1, ]
+# [1]  9.586457  7.194073  9.718831  9.121589 18.548415  6.288808  7.219317  8.229141  7.301282
+# [10] 49.509147  7.993822  6.210289  7.550884 11.020195  7.933567  8.152397  8.178039  6.330099
+# [19]  6.191472  6.535123  8.541336 34.789726  8.384959 11.455657 11.638807 11.501653  8.177425
+# [28]  9.262253  9.736387
+
+# i = 10, p = 60, 50
+# i = 22, p = 66, 35
+# i = 5,  p = 27, 19
+# i = 24, p = 9, 11.4
+# i = 1, p = 7, 9.6
+# i = 19, p = 7, 6.2
+
+plot(c(7, 9, 27, 60, 66), c(9.6, 11.4, 19, 50, 35), type = "l")
 
