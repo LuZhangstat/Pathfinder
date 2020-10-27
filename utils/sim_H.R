@@ -160,9 +160,7 @@ is_typical <- function(model, data, init_param_unc, M, int_time, lp_0) {
                       chains = 1, iter = 2, warmup = 1, refresh = 0,
                       control = list(metric = "unit_e",
                                      adapt_engaged = TRUE,
-                                     max_treedepth = 1 #,
-                                     # <-  stepsize
-                      ),
+                                     max_treedepth = 1),
                       save_warmup = TRUE)
     stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"]/2
     

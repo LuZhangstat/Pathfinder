@@ -135,7 +135,8 @@ lp_draws <- function(posterior, init_param_unc, int_time, fn, gr, stepsize) {
     theta_up <- theta_up + stepsize * rho
     tryCatch(draws[l + 1] <- fn(theta_up),
              error = function(e) { break_flag <<- TRUE })
-    if(break_flag | is.na(draws[l + 1])){
+    if(break_flag | is.na(draws[l + 1]) | is.infinite(draws[l + 1]) | 
+       abs(draws[l + 1]) > 1e10){
       draws = draws[1:l]; break}
     if(l < int_time){
       tryCatch(g1 <- gr(theta_up),
@@ -165,15 +166,23 @@ is_typical <- function(model, data, init_param_unc, M, int_time, lp_0) {
   posterior <- to_posterior(model, data)
   init_fun <- function(chain_id) constrain_pars(posterior, init_param_unc)
   # find a stepsize #
-  fit_0 <- sampling(model, data = data, init = init_fun,
-                    chains = 1, iter = 2, warmup = 1, refresh = 0,
-                    control = list(metric = "unit_e",
-                                   adapt_engaged = TRUE,
-                                   max_treedepth = 1 #,
-                                   # <-  stepsize
-                    ),
-                    save_warmup = TRUE)
-  stepsize <- get_sampler_params(fit_0)[[1]][1, "stepsize__"]/2
+  # stepsize_l <- c()
+  # t_ss <- proc.time()
+  # for(lss in 1:1){
+  #   fit_0 <- sampling(model, data = data, init = init_fun,
+  #                     chains = 1, iter = 2, warmup = 1, refresh = 0,
+  #                     control = list(metric = "unit_e",
+  #                                    adapt_engaged = TRUE,
+  #                                    max_treedepth = 1 
+  #                     ),
+  #                     save_warmup = TRUE)
+  #   stepsize_l[lss] <- get_sampler_params(fit_0)[[1]][1, "stepsize__"]
+  # }
+  # print(proc.time() - t_ss)
+  
+  # stepsize <- mean(stepsize_l) * 2 / 3
+  
+  stepsize <- 0.005
   
   # generate hamiltonian dynamics
   fn <- function(theta) log_prob(posterior, theta, adjust_transform = FALSE, 
@@ -192,6 +201,11 @@ find_typical <- function(param_path, model, data, M = 4, int_time = 12) {
   D <- dim(param_path)[2] - 1   # includes objective in last position
   record_lp_draws <- list()
   record_stepsize <- list()
+  if(is.null(N)){ # if the opath is a vector (no optimization path)
+    return(list(typical_index = typical_index, 
+                record_lp_draws = record_lp_draws,
+                record_stepsize = record_stepsize))
+  }
   for (n in 1:N) {
     record_lp_draws[[n]] <- list()
     typl_res <- is_typical(model, data, param_path[n, 1:D], M, int_time,

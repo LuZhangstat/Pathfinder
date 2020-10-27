@@ -132,14 +132,17 @@ lp_draws <- function(posterior, init_param_unc, int_time, fn, gr, stepsize) {
   draws <- c()
   g0 <- gr(theta_up)
   lp0 <- fn(theta_up)
+  draws[1] <- lp0
   rho0 = (sqrt(length(theta_up)) / sqrt(sum(g0^2)))*g0
   rho <- rho0 + 0.5 * stepsize * g0
   break_flag <- FALSE
   for (l in 1:int_time){
     theta_up <- theta_up + stepsize * rho
-    tryCatch(draws[l] <- fn(theta_up),
+    tryCatch(draws[l + 1] <- fn(theta_up),
              error = function(e) { break_flag <<- TRUE })
-    if(break_flag | is.na(draws[l])){break}
+    if(break_flag | is.na(draws[l + 1]) | is.infinite(draws[l + 1]) | 
+       abs(draws[l + 1]) > 1e10){
+      draws = draws[1:l]; break}
     if(draws[l] > lp0){ counts_inc = counts_inc + 1 } # record increase lp or not
     if(draws[l] < lp0 - 0.3 * sum(rho0^2) && 
        draws[l] > lp0 - 0.6 * sum(rho0^2)){ trapped = trapped + 1 } # record trapped or not
@@ -151,10 +154,10 @@ lp_draws <- function(posterior, init_param_unc, int_time, fn, gr, stepsize) {
     }
   }
   if(counts_inc > 2 && trapped > 0 && 
-     (max(draws, na.rm = TRUE) -lp0) < (log(sum(rho0^2))*2 + 1) ){ 
+     (max(draws, na.rm = TRUE) -lp0) < sum(rho0^2)){ 
     mark = 1 # record mark or not, mark the points that reach from the bottom of a curvature
   } 
-  return(list(mark = mark, draws = c(lp0, draws), counts_inc = counts_inc,
+  return(list(mark = mark, draws = draws, counts_inc = counts_inc,
               trapped = trapped))
 }
 
@@ -195,6 +198,9 @@ lp_draws_2 <- function(posterior, init_param_unc, int_time, fn, gr, stepsize) {
 }
 
 is_typical <- function(model, data, init_param_unc, M, int_time, lp_0) {
+  
+  draws <- list() # preallocate Hamiltonian pathes
+  
   posterior <- to_posterior(model, data)
   init_fun <- function(chain_id) constrain_pars(posterior, init_param_unc)
   # find a stepsize #
@@ -209,6 +215,7 @@ is_typical <- function(model, data, init_param_unc, M, int_time, lp_0) {
                       save_warmup = TRUE)
     stepsize_l[lss] <- get_sampler_params(fit_0)[[1]][1, "stepsize__"]
   }
+  
   stepsize <- mean(stepsize_l) * 2 / 3
   
   # generate hamiltonian dynamics
@@ -219,28 +226,40 @@ is_typical <- function(model, data, init_param_unc, M, int_time, lp_0) {
   lps <- lp_draws(posterior, init_param_unc, int_time, fn, gr, stepsize)
   #lps2 <- lp_draws_2(posterior, init_param_unc, int_time, fn, gr, stepsize)
   
-  return(list(lps = lps))
+  draws[[1]] <- lps$draws
+  
+  return(list(draws = draws, stepsize = stepsize, mark = lps$mark,
+              counts_inc = lps$counts_inc, trapped = lps$trapped))
 }
 
-find_typical <- function(param_path, model, data, M = 4, int_time = 30) {
+find_typical <- function(param_path, model, data, M = 4, int_time = 20) {
   typical_index <- c()          # return the index of sample in param_path that is identified as a good initial
   N <- dim(param_path)[1]
   D <- dim(param_path)[2] - 1   # includes objective in last position
   record_lp_draws <- list()
+  record_stepsize <- list()
+  if(is.null(N)){ # if the opath is a vector (no optimization path)
+    return(list(typical_index = typical_index, 
+                record_lp_draws = record_lp_draws,
+                record_stepsize = record_stepsize))
+  }
   for (n in 1:N) {
     record_lp_draws[[n]] <- list()
     typl_res <- is_typical(model, data, param_path[n, 1:D], M, int_time,
                                   param_path[n, D + 1])
-    record_lp_draws[[n]] <- typl_res$lps$draws
+    record_lp_draws[[n]] <- typl_res$draws
+    record_stepsize[[n]] <- typl_res$stepsize
     printf("n = %3d  counts_inc1 = %3d, trapped1 = %3d",
-           n, typl_res$lps$counts_inc, typl_res$lps$trapped)
+           n, typl_res$counts_inc, typl_res$trapped)
     
-    if (typl_res$lps$mark == 1){
+    if (typl_res$mark == 1){
       print(param_path[n, 1:(D + 1)], digits = 2)
       typical_index <- c(typical_index, n)
     }
   }
-  return(typical_index)
+  return(list(typical_index = typical_index, 
+              record_lp_draws = record_lp_draws,
+              record_stepsize = record_stepsize))
 }
 
 # library('rstan')
