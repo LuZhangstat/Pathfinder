@@ -33,39 +33,47 @@ opt_path <- function(init, fn, gr, lp_f,
   #init <- runif(D, -init_bound, init_bound)
   c = 1.0; rho = 1.0
   # preallocation
-  RHR_list <- list()
   E_lp <- c()
   E <- c()
-  ill_cond = c()    #0.0 no problem, 1.0 not pd Hessian
+  #ill_cond = c()    #0.0 no problem, 1.0 not pd Hessian
   step_count = c()
   
-  D <- length(init)
   y <- matrix(NA, nrow = 1, ncol = D + 2)
   y[1, 1:D] <- init
   y[1, D + 1] <- fn(init)
   y[1, D + 2] <- lp_f(init)
   n0 = 1
+  abs_tol = 1e-2; accept_tol = 1e-13;
+  factor_tol = 1e-5;
   
   for (j in 1:N_mode_max){
     cat(j, "\t")
-    RHR_fail <- FALSE
-    tryCatch(RHR_fit <- RHR(fn, gr, y[n0, 1:D], sigma0 = 1.0, max_iter = N1, 
-                            abs_tol = 1e-3, accept_tol = 1e-10), 
-             error = function(e) { RHR_fail <<- TRUE})
-    
-    
-    if(RHR_fail && j == 1){
-      for(l in 1:40){
-        print("\n reinitialize \n")
-        y[n0, 1:D] <- runif(D, -init_bound, init_bound)
-        y[n0, D + 1] <- fn(y[n0, 1:D])
-        y[n0, D + 2] <- lp_f(y[n0, 1:D])
-        RHR_fail <- FALSE
-        tryCatch(RHR_fit <- RHR(fn, gr, y[n0, 1:D], sigma0 = 1.0, max_iter = N1, 
-                                abs_tol = 1e-3, accept_tol = 1e-10), 
-                 error = function(e) { RHR_fail <<- TRUE})
-        if(!RHR_fail){break}
+    if(j == 1){
+      RHR_fail <- FALSE
+      tryCatch(RHR_fit <- RHR(fn, gr, y[n0, 1:D], sigma0 = 1.0, max_iter = N1, 
+                              abs_tol = abs_tol, factor_tol = factor_tol,
+                              accept_tol = accept_tol), 
+               error = function(e) { RHR_fail <<- TRUE})
+      if(RHR_fail){
+        for(l in 1:40){
+          print("\n reinitialize \n")
+          y[n0, 1:D] <- runif(D, -init_bound, init_bound)
+          y[n0, D + 1] <- fn(y[n0, 1:D])
+          y[n0, D + 2] <- lp_f(y[n0, 1:D])
+          RHR_fail <- FALSE
+          tryCatch(RHR_fit <- RHR(fn, gr, y[n0, 1:D], sigma0 = 1.0, max_iter = N1, 
+                                  abs_tol = abs_tol, factor_tol = factor_tol,
+                                  accept_tol = accept_tol), 
+                   error = function(e) { RHR_fail <<- TRUE})
+          if(!RHR_fail){break}
+        }
       }
+    } else { #j > 1
+      RHR_fail <- FALSE
+      tryCatch(RHR_fit <- RHR(fn, gr, y[n0, 1:D], sigma0 = 1.0, max_iter = N1, 
+                              abs_tol = abs_tol, factor_tol = factor_tol,
+                              accept_tol = accept_tol), 
+               error = function(e) { RHR_fail <<- TRUE})
     }
     
     
@@ -112,7 +120,8 @@ opt_path <- function(init, fn, gr, lp_f,
       break
     }
   }
-  return(list(E_lp = E_lp, E = E, y = y))
+  #E_lp
+  return(list(E_lp = E_lp, E = E, y = y, step_count = step_count))
 }
 
 
@@ -187,8 +196,11 @@ params_only <- function(path) {
 find_indx <- function(param_path) {
   mode_ind = length(param_path$E)
   E_target = param_path$E[mode_ind]
-  mark_index = which.min(abs(param_path$y[, ncol(param_path$y) - 1] - E_target))
-  return(mark_index)
+  mark_index = which.min(abs(param_path$y[, (ncol(param_path$y) - 1)] - E_target))
+  mark_index2 = which.min(abs(param_path$y[, (ncol(param_path$y))] - 
+                                param_path$E_lp[mode_ind]))
+  
+  return(mark_index2)
 }
 
 # library('rstan')
