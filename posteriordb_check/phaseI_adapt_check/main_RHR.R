@@ -30,7 +30,7 @@ MC = mc.cores    # 10 iterations
 MC = 3
 init_bound = 2
 width = 600; height = 500 # the size of the plot
-seed_list = 1:MC
+seed_list = 1:MC 
 
 
 ##setting 11##
@@ -45,7 +45,7 @@ lp_INV <- array(data = NA, dim = c(2, length(model_record)))
 lp_mean <- c()
 lp_opath <- c()
 
-for(i in 1:length(model_record)){ #
+for(i in 1:length(model_record)){ #length(model_record)
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   
@@ -87,7 +87,7 @@ opath[[3]][39, ncol(opath[[1]])]
 # load("../results/lp_posteriordb_phI_adapt_set9.RData")
 
 ## check the plots ##
-for(i in 1:length(model_record)){ #
+for(i in 1:length(model_record)){ #length(model_record)
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   #i = model_record[i]
@@ -132,11 +132,24 @@ for(i in 1:length(model_record)){ #
     ggtitle(paste("model:", modelname,"\n", "estimated E(lp):", 
                   paste(sapply(lp_opath[[i]]$opath[chain_id], 
                          f <- function(x){ 
-                           if(is.null(x$E_lp[length(x$E_lp)])){"NULL"}else{
+                           if(is.na(x$E_lp[length(x$E_lp)])){"NA"}else{
                              round(x$E_lp[length(x$E_lp)], digits = 1)
                            }}), 
                         collapse = " "), 
-                  "VS E(lp):", round(lp_mean[i], digits = 1)))+
+                  "VS E(lp):", round(lp_mean[i], digits = 1),
+                  "\n", "counts in line search:", 
+                  paste(sapply(lp_opath[[i]]$opath[chain_id], 
+                               f <- function(x){ 
+                                 if(is.na(x$E_lp[length(x$E_lp)])){"NULL"}else{
+                                   sum(x$step_count)
+                                 }}), 
+                        collapse = " "), "No. of sample",
+                  paste(sapply(lp_opath[[i]]$opath[chain_id], 
+                               f <- function(x){ 
+                                 if(is.na(x$E_lp[1])){"0"}else{
+                                   N_sam * length(x$E_lp)
+                                 }}), 
+                        collapse = " "))) +
     theme_bw() 
   
   jpeg(filename = paste0("../pics/phI_adapt_setting11/No", model_record[i], "-", 
@@ -157,14 +170,27 @@ for(i in 1:length(model_record)){ #
          ,
          max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
              max(p_lp_trace$lp__))) + 
-    ggtitle(paste("model:", modelname, "\n", "estimated E(lp):", 
+    ggtitle(paste("model:", modelname,"\n", "estimated E(lp):", 
                   paste(sapply(lp_opath[[i]]$opath[chain_id], 
                                f <- function(x){ 
-                                 if(is.null(x$E_lp[length(x$E_lp)])){"NULL"}else{
+                                 if(is.na(x$E_lp[length(x$E_lp)])){"NA"}else{
                                    round(x$E_lp[length(x$E_lp)], digits = 1)
                                  }}), 
                         collapse = " "), 
-                  "VS E(lp):", round(lp_mean[i], digits = 1)))+
+                  "VS E(lp):", round(lp_mean[i], digits = 1),
+                  "\n", "counts in line search:", 
+                  paste(sapply(lp_opath[[i]]$opath[chain_id], 
+                               f <- function(x){ 
+                                 if(is.na(x$E_lp[length(x$E_lp)])){"NULL"}else{
+                                   sum(x$step_count)
+                                 }}), 
+                        collapse = " "), "No. of sample",
+                  paste(sapply(lp_opath[[i]]$opath[chain_id], 
+                               f <- function(x){ 
+                                 if(is.na(x$E_lp[1])){"0"}else{
+                                   N_sam * length(x$E_lp)
+                                 }}), 
+                        collapse = " "))) +
     theme_bw() 
   
   jpeg(filename = paste0("../pics/phI_adapt_setting11/No", model_record[i], "-", 
@@ -185,14 +211,27 @@ for(i in 1:length(model_record)){ #
          ,
          max(lp_INV[2, i] + (lp_INV[2, i] - lp_INV[1, i]), 
              max(p_lp_trace$lp__))) + 
-    ggtitle(paste("model:", modelname, "\n", "estimated E(lp):", 
+    ggtitle(paste("model:", modelname,"\n", "estimated E(lp):", 
                   paste(sapply(lp_opath[[i]]$opath[chain_id], 
                                f <- function(x){ 
-                                 if(is.null(x$E_lp[length(x$E_lp)])){"NULL"}else{
+                                 if(is.na(x$E_lp[length(x$E_lp)])){"NA"}else{
                                    round(x$E_lp[length(x$E_lp)], digits = 1)
                                  }}), 
                         collapse = " "), 
-                  "VS E(lp):", round(lp_mean[i], digits = 1)))+
+                  "VS E(lp):", round(lp_mean[i], digits = 1),
+                  "\n", "counts in line search:", 
+                  paste(sapply(lp_opath[[i]]$opath[chain_id], 
+                               f <- function(x){ 
+                                 if(is.na(x$E_lp[length(x$E_lp)])){"NULL"}else{
+                                   sum(x$step_count)
+                                 }}), 
+                        collapse = " "), "No. of sample",
+                  paste(sapply(lp_opath[[i]]$opath[chain_id], 
+                               f <- function(x){ 
+                                 if(is.na(x$E_lp[1])){"0"}else{
+                                   N_sam * length(x$E_lp)
+                                 }}), 
+                        collapse = " "))) +
     theme_bw() 
   
   jpeg(filename = paste0("../pics/phI_adapt_setting11/No", model_record[i], "-", 
@@ -216,7 +255,7 @@ for(i in 1:length(model_record)){ #
 ##No: 3: bball_drive_event_0-hmm_drive_0 # multimodel. Also need checking
 ##No: 41: mcycle_gp-accel_gp           ## Not very good
 
-i = which(model_record == 20)
+i = which(model_record == 36)
 p_lp <- ggplot(data = p_lp_trace, 
                aes(x=iter, y=lp__, group=chain, color=label)) +
   geom_line(colour = "grey") + geom_point(size = 1) + 
