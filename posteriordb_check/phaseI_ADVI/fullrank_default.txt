@@ -1,0 +1,122 @@
+model 1: arK-arK 
+benchmark lp INV: 264.178 273.765 benchmark lp_ mean: 270.73 
+ADVI lp INV: 257.776 273.672 ADVI lp_ mean: 269.49 
+ADVI lp INV: 257.966 273.676 ADVI lp_ mean: 269.716 
+ADVI lp INV: 258.806 273.581 ADVI lp_ mean: 269.563 
+model 2: arma-arma11 
+benchmark lp INV: 252.007 259.201 benchmark lp_ mean: 257.271 
+ADVI lp INV: -2.043799e+259 -22.267 ADVI lp_ mean: -1.244023e+281 
+model 3: bball_drive_event_0-hmm_drive_0 
+benchmark lp INV: -1908.042 -1898.323 benchmark lp_ mean: -1901.107 
+model 4: bball_drive_event_1-hmm_drive_1 
+benchmark lp INV: -6939.044 -6929.922 benchmark lp_ mean: -6932.678 
+model 6: diamonds-diamonds 
+benchmark lp INV: 3261.455 3280.003 benchmark lp_ mean: 3272.491 
+ADVI lp INV: 1186.402 2794.213 ADVI lp_ mean: 2373.625 
+ADVI lp INV: 1484.114 2841.92 ADVI lp_ mean: 2447.336 
+model 8: dogs-dogs 
+benchmark lp INV: -298.466 -292.177 benchmark lp_ mean: -293.658 
+ADVI lp INV: -315.016 -292.203 ADVI lp_ mean: -295.646 
+ADVI lp INV: -318.725 -292.219 ADVI lp_ mean: -296.818 
+ADVI lp INV: -330.405 -292.736 ADVI lp_ mean: -298.085 
+model 11: earnings-logearn_height_male 
+benchmark lp INV: -450.805 -443.586 benchmark lp_ mean: -445.454 
+ADVI lp INV: -594.462 -484.793 ADVI lp_ mean: -528.844 
+ADVI lp INV: -5058.99 -1811.028 ADVI lp_ mean: -3261.246 
+ADVI lp INV: -886.644 -509.609 ADVI lp_ mean: -597.367 
+model 13: earnings-logearn_interaction_z 
+benchmark lp INV: -451.837 -443.608 benchmark lp_ mean: -445.891 
+ADVI lp INV: -552.636 -444.224 ADVI lp_ mean: -461.166 
+ADVI lp INV: -608.889 -445.216 ADVI lp_ mean: -471.194 
+ADVI lp INV: -490.602 -443.782 ADVI lp_ mean: -452.428 
+model 15: earnings-logearn_logheight_male 
+benchmark lp INV: -450.8 -443.499 benchmark lp_ mean: -445.382 
+ADVI lp INV: -569.599 -443.662 ADVI lp_ mean: -464.644 
+ADVI lp INV: -460.092 -443.558 ADVI lp_ mean: -446.742 
+ADVI lp INV: -461.688 -443.753 ADVI lp_ mean: -446.881 
+model 20: eight_schools-eight_schools_centered 
+benchmark lp INV: -29.435 20.074 benchmark lp_ mean: -13.374 
+ADVI lp INV: -30.86 -9.357 ADVI lp_ mean: -14.739 
+ADVI lp INV: -27.365 -9.601 ADVI lp_ mean: -14.896 
+ADVI lp INV: -30.294 -9.775 ADVI lp_ mean: -14.916 
+model 23: garch-garch11 
+benchmark lp INV: -274.748 -266.754 benchmark lp_ mean: -268.816 
+ADVI lp INV: -282.349 -266.836 ADVI lp_ mean: -269.611 
+ADVI lp INV: -287.044 -266.93 ADVI lp_ mean: -270.546 
+ADVI lp INV: -291.251 -266.81 ADVI lp_ mean: -270.274 
+model 25: gp_pois_regr-gp_regr 
+benchmark lp INV: -1.082 5.129 benchmark lp_ mean: 3.703 
+ADVI lp INV: -2.315 5.134 ADVI lp_ mean: 3.48 
+ADVI lp INV: -5.018 5.124 ADVI lp_ mean: 3.219 
+ADVI lp INV: -4.859 5.124 ADVI lp_ mean: 2.865 
+model 26: hmm_example-hmm_example 
+benchmark lp INV: -175.866 -168.315 benchmark lp_ mean: -170.265 
+model 27: hudson_lynx_hare-lotka_volterra 
+benchmark lp INV: 20.867 31.887 benchmark lp_ mean: 28.266 
+model 29: kidiq_with_mom_work-kidscore_interaction_c 
+benchmark lp INV: -1473.967 -1466.034 benchmark lp_ mean: -1468.338 
+ADVI lp INV: -1639.049 -1467.302 ADVI lp_ mean: -1502.974 
+ADVI lp INV: -1983.807 -1804.794 ADVI lp_ mean: -1897.969 
+ADVI lp INV: -2067.004 -1943.778 ADVI lp_ mean: -2005.104 
+model 31: kidiq_with_mom_work-kidscore_interaction_z 
+benchmark lp INV: -1474.205 -1466.052 benchmark lp_ mean: -1468.346 
+ADVI lp INV: -1589.189 -1466.421 ADVI lp_ mean: -1481.795 
+ADVI lp INV: -2014.942 -1833.653 ADVI lp_ mean: -1921.813 
+ADVI lp INV: -1519.913 -1467.444 ADVI lp_ mean: -1480.651 
+model 33: kidiq-kidscore_interaction 
+benchmark lp INV: -1478.18 -1470.002 benchmark lp_ mean: -1472.3 
+ADVI lp INV: -1708.117 -1481.342 ADVI lp_ mean: -1518.288 
+ADVI lp INV: -1495.677 -1483.197 ADVI lp_ mean: -1487.745 
+ADVI lp INV: -1501.533 -1485.976 ADVI lp_ mean: -1491.767 
+model 34: kidiq-kidscore_momhs 
+benchmark lp INV: -1520.476 -1514.146 benchmark lp_ mean: -1515.593 
+ADVI lp INV: -1604.157 -1550.855 ADVI lp_ mean: -1570.934 
+ADVI lp INV: -1603.992 -1538.504 ADVI lp_ mean: -1560.803 
+ADVI lp INV: -1617.627 -1543.772 ADVI lp_ mean: -1572.542 
+model 36: kidiq-kidscore_momiq 
+benchmark lp INV: -1484.107 -1477.916 benchmark lp_ mean: -1479.379 
+ADVI lp INV: -1505.963 -1480.914 ADVI lp_ mean: -1487.508 
+ADVI lp INV: -1495.446 -1482.863 ADVI lp_ mean: -1486.233 
+ADVI lp INV: -1530.697 -1484.152 ADVI lp_ mean: -1492.431 
+model 37: kilpisjarvi_mod-kilpisjarvi 
+benchmark lp INV: -43.279 -36.744 benchmark lp_ mean: -38.261 
+ADVI lp INV: -491.054 -339.252 ADVI lp_ mean: -409.961 
+model 40: low_dim_gauss_mix-low_dim_gauss_mix 
+benchmark lp INV: -2113.133 -2104.591 benchmark lp_ mean: -2106.897 
+ADVI lp INV: -2524.692 -2476.494 ADVI lp_ mean: -2495.849 
+ADVI lp INV: -2516.814 -2493.148 ADVI lp_ mean: -2498.462 
+ADVI lp INV: -2535.329 -2481.134 ADVI lp_ mean: -2496.661 
+model 41: mcycle_gp-accel_gp 
+benchmark lp INV: -668.411 -633.621 benchmark lp_ mean: -649.295 
+model 43: mesquite-logmesquite_logva 
+benchmark lp INV: 19.339 27.724 benchmark lp_ mean: 25.292 
+ADVI lp INV: 16.836 27.743 ADVI lp_ mean: 24.952 
+ADVI lp INV: 13.514 27.534 ADVI lp_ mean: 24.032 
+ADVI lp INV: 16.253 27.586 ADVI lp_ mean: 24.025 
+model 47: mesquite-logmesquite 
+benchmark lp INV: 18.488 29.943 benchmark lp_ mean: 26.286 
+ADVI lp INV: 9.347 29.133 ADVI lp_ mean: 22.42 
+ADVI lp INV: 14.864 29.563 ADVI lp_ mean: 25.371 
+ADVI lp INV: 14.866 29.481 ADVI lp_ mean: 25.116 
+model 51: nes1972-nes 
+benchmark lp INV: -1512.732 -1501.093 benchmark lp_ mean: -1505.024 
+ADVI lp INV: -1561.193 -1508.018 ADVI lp_ mean: -1528.236 
+ADVI lp INV: -1559.428 -1503.304 ADVI lp_ mean: -1521.568 
+ADVI lp INV: -1573.162 -1511.29 ADVI lp_ mean: -1534.471 
+model 55: nes1988-nes 
+benchmark lp INV: -1255.101 -1243.599 benchmark lp_ mean: -1247.486 
+ADVI lp INV: -1313.993 -1251.466 ADVI lp_ mean: -1276.423 
+ADVI lp INV: -1299.534 -1247.993 ADVI lp_ mean: -1267.558 
+ADVI lp INV: -1342.231 -1263.568 ADVI lp_ mean: -1293.272 
+model 61: one_comp_mm_elim_abs-one_comp_mm_elim_abs 
+benchmark lp INV: 20.886 29.064 benchmark lp_ mean: 26.886 
+model 94: sblrc-blr 
+benchmark lp INV: -171.204 -161.942 benchmark lp_ mean: -164.648 
+ADVI lp INV: -663.123 -349.778 ADVI lp_ mean: -422.572 
+ADVI lp INV: -293.904 -174.977 ADVI lp_ mean: -199.775 
+ADVI lp INV: -618.899 -355.584 ADVI lp_ mean: -406.38 
+model 95: sblri-blr 
+benchmark lp INV: -163.84 -154.104 benchmark lp_ mean: -156.898 
+ADVI lp INV: -447.2 -247.234 ADVI lp_ mean: -305.087 
+ADVI lp INV: -215.622 -155.177 ADVI lp_ mean: -167.562 
+ADVI lp INV: -527.716 -262.127 ADVI lp_ mean: -314.177 
