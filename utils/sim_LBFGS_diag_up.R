@@ -1,4 +1,5 @@
 library(loo)
+library(Matrix)
 printf <- function(msg, ...) cat(sprintf(msg, ...), "\n")
 
 to_posterior <- function(model, data) {
@@ -12,23 +13,28 @@ to_posterior <- function(model, data) {
 # matrix is an iteration, and there are N + 1 rows because the
 # initialization is included.
 #
-# For N iterations, the algorithm makes N calls to the base
-# R function optim(), with max iteration set to n for each n in 1:N.
-# This allows programmatic access to the iterations of optim(), but is
-# O(N^2). Thanks to Calvin Whealton for the approach:
-#   https://stackoverflow.com/a/46904780).
 #
-# @param x_init initial parameter values
-# @param fn objective function
-# @param gr gradient function of objective
-# @param N total number of iterations (default 25)
+# @param init  initial parameter values
+# @param fn          negative of log-density 
+# @param gr          gradient function of negative log-density 
+# @param lp_f        log-density
+# @param init_bound  the boundwith of random initials for each dimension
+# @param N1          maxium number of iterations for L-BFGS (default = 300)
+# @param N_mode_max  maximum number of loop in pathfinder (default = 20)
+# @param factr_tol   the option factr_tol in optim() (default = 1e9)
+# @param lmm         the option lmm in optim() (default = 5)
 # @return optimization path, matrix with N rows, each of which is a
 #         point on the optimization path followed by objective
+# E_lp = E_lp, E = E, lVol = lVol, log_MASS_c = log_MASS_c, 
+# pareto_k = pareto_k, cond_num = cond_num, 
+# y = y, step_count = step_count, fn_call = fn_call, 
+# gr_call = gr_call, lgnorms = lgnorms, 
+# sknorm_ls = sknorm_ls, thetak_ls = thetak_ls
 
 
 opt_path <- function(init, fn, gr, lp_f, 
                      init_bound = 2.0,
-                     N1 = 100, N_mode_max = 20, 
+                     N1 = 300, N_mode_max = 20, 
                      N_sam = 100, factr_tol = 1e9, lmm = 5) {
   D <- length(init)
   #init <- runif(D, -init_bound, init_bound)
@@ -37,7 +43,6 @@ opt_path <- function(init, fn, gr, lp_f,
   E <- c()
   lVol <- c()
   log_MASS_c <- c()
-  #ill_cond = c()    #0.0 no problem, 1.0 not pd Hessian
   step_count = c()
   fn_call = c()     # No. calls to fn
   gr_call = c()     # No. calls to gr
@@ -255,44 +260,22 @@ opt_path <- function(init, fn, gr, lp_f,
       }
     }
     
-    
-    # Lk = matrix(0.0, nrow = m, ncol = m)
-    # for(s in 1:(m-1)){
-    #   for(i in (s+1):m){
-    #     Lk[i, s] = sum(Skt[i, ] * Ykt[s, ])
-    #   }
-    # }
-    
-    inv_theta_D = (thetak[1] + Ykt[1, ]^2 / Dk[1] - 
+    # inv_theta_D = 1 / thetak[1] + Skt[1, ]^2 / Dk[1] - 
+    #   Dk[1] * Ykt[1, ]^2 / sum(Ykt[1, ]^2)^2
+    inv_theta_D = (thetak[1] + Ykt[1, ]^2 / Dk[1] -
                  thetak[1] * Skt[1, ]^2 / sum(Skt[1, ]^2))^{-1}
     for(d in 2:m){
-      inv_theta_D = 1 / ((sum(inv_theta_D * Ykt[d, ]^2) / Dk[d]) / 
-        inv_theta_D + Ykt[d, ]^2 / Dk[d] - 
-        (sum(inv_theta_D * Ykt[d, ]^2) / Dk[d]) * (Skt[d, ] / inv_theta_D)^2 / 
+      # inv_theta_D = Dk[d] * inv_theta_D / sum(Ykt[d, ]^2 * inv_theta_D) + 
+      #   Skt[d, ]^2 / Dk[d] - 
+      #   Dk[d] * (inv_theta_D *  Ykt[d, ])^2 / sum(inv_theta_D * Ykt[d, ]^2)^2
+      inv_theta_D = 1 / ((sum(inv_theta_D * Ykt[d, ]^2) / Dk[d]) /
+        inv_theta_D + Ykt[d, ]^2 / Dk[d] -
+        (sum(inv_theta_D * Ykt[d, ]^2) / Dk[d]) * (Skt[d, ] / inv_theta_D)^2 /
         sum(Skt[d, ]^2 / inv_theta_D))
-      #cat("\n", summary(1/inv_theta_D))
     }
     
     theta_D = 1 / inv_theta_D
-    # theta_D = (gr(x_center + 1e-3) - gr(x_center - 1e-3))/(2e-3)
-    # if (any(theta_D < 0)) {
-    #   theta = sum(Ykt[m, ]^2) / sum(Ykt[m, ]*Skt[m, ])
-    #   theta_D = rep(theta, D)
-    # }
-    #theta = sum(Ykt[1, ]^2) / sum(Ykt[1, ]*Skt[1, ])
-    #theta = thetak[length(thetak)]
-    #theta = sum(Ykt[m, ]^2) / sum(Ykt[m, ]*Skt[m, ])
-    # invMk = rbind(cbind(-diag(Dk), t(Lk)),
-    #               cbind(Lk, theta * tcrossprod(Skt)))
-    # 
-    # Mk = solve(invMk)
-    # Wkt = rbind(Ykt, theta*Skt)
-    # Bk = theta*diag(D) - t(Wkt)%*%Mk%*%Wkt
-    # cholBk <- chol(Bk);
-    # u = matrix(rnorm(D * N_sam), ncol = N_sam)
-    # u2 = solve(cholBk)%*% u + x_center
-    
-    #Wkbart = rbind(Ykt / theta, Skt)
+
     Rk = matrix(0.0, nrow = m, ncol = m)
     for(s in 1:m){
       for(i in 1:s){
@@ -316,6 +299,15 @@ opt_path <- function(init, fn, gr, lp_f,
       cond_num[j] = eigen_v[1]/eigen_v[length(eigen_v)]
       u = matrix(rnorm(D * N_sam), ncol = N_sam)
       u2 = crossprod(cholHk, u) + x_center
+      
+      # generate the samples uniformly from the region x^T H^{-1} x < qchisq(0.95, D)
+      gamma = qchisq(0.95, D)
+      s_V1 = sqrt(colSums(u^2))
+      u_V1 = sapply(1:N_sam, function(i){ u[, i] / s_V1[i]})
+      r_V1 = runif(N_sam)^{1/D}
+      y_V = sapply(1:N_sam, function(i){ u_V1[, i] / r_V1[i]}) 
+      z2 = sqrt(gamma)*crossprod(cholHk, y_V) + x_center
+      
     } else {
        # use equation ?? to sample
       Wkbart = rbind(Ykt%*%diag(1/sqrt(theta_D)), ninvRST%*%diag(sqrt(theta_D)))
@@ -333,30 +325,40 @@ opt_path <- function(init, fn, gr, lp_f,
       u1 = crossprod(Qk, u)
       u2 = diag(1/sqrt(theta_D)) %*% 
         (Qk %*% crossprod(Rktilde, u1) + (u - Qk %*% u1)) + x_center
+      
+      # generate the samples uniformly from the region x^T H^{-1} x < qchisq(0.95, D)
+      gamma = qchisq(0.95, D)
+      s_V1 = sqrt(colSums(u^2))
+      u_V1 = sapply(1:N_sam, function(i){ u[, i] / s_V1[i]})
+      r_V1 = runif(N_sam)^{1/D}
+      y_V = sapply(1:N_sam, function(i){ u_V1[, i] / r_V1[i]}) 
+      z1 = crossprod(Qk, y_V)
+      z2 = diag(sqrt(gamma)/sqrt(theta_D)) %*% 
+        (Qk %*% crossprod(Rktilde, z1) + (y_V - Qk %*% z1)) + x_center
+      
     }
-    
-    # Hk = 1/theta * diag(D) + t(Wkbart) %*% Mkbar %*% Wkbart
-    # cholHk = chol(Hk)
-    # eigen_v = eigen(Hk)$values
-    # cond_num[j] = eigen_v[1]/eigen_v[length(eigen_v)]
-    # u = matrix(rnorm(D * N_sam), ncol = N_sam)
-    # u2 = t(cholHk)%*% u + x_center
     
     fn_draws <-  c()
     ind_draws <- c()
     lp_f_draws <- c()
     lp_approx_draws <- c()
+    lp_f_z2_draws <- c() # records the log_density of samples uniformly from
+                         # the 95% CI of approximating Gaussian
     for(l in 1:ncol(u)){
+      
+      # skip bad samples
       skip_flag = FALSE
       tryCatch(f_test <- fn(u2[, l]),
                error = function(e) { skip_flag <<- TRUE})
-      if(skip_flag){next}
+      if(skip_flag){next} 
       else {
+        
         ind_draws <- c(ind_draws, l)
         fn_draws <- c(fn_draws, f_test)
         lp_f_draws <- c(lp_f_draws, lp_f(u2[, l]))
         lp_approx_draws <- c(lp_approx_draws, - logdetcholHk - 
                                0.5 * sum(u[, l]^2))
+        lp_f_z2_draws <- c(lp_f_z2_draws, lp_f(z2[, l]))
       }
     }
     fn_call[j] = fn_call[j] + N_sam
@@ -368,24 +370,22 @@ opt_path <- function(init, fn, gr, lp_f,
       lp_f_draws = lp_f_draws[keep_ind]
     } 
     lp_ratios = - fn_draws - lp_approx_draws 
-    #lp_ratios = lp_ratios - 
-    #  (log(sum(exp(lp_ratios - mean(lp_ratios)))) + mean(lp_ratios))
-    #sum(exp(lp_ratios))
-    #sum(exp(lp_ratios) * lp_f_draws)
     psis_test = psis(lp_ratios, r_eff = 1)
-    #psis_n_eff_values(tt)
     pareto_k[j] = pareto_k_values(psis_test)
-    unif_weight <- weights(psis(-lp_approx_draws, r_eff = 1), log = FALSE)
+    #unif_weight <- weights(psis(-lp_approx_draws, r_eff = 1), log = FALSE)
     
     E_lp[j] = sum(c(weights(psis_test, log = FALSE)) * lp_f_draws) #mean(lp_f_draws)
     E[j] = sum(c(weights(psis_test, log = FALSE)) * fn_draws) #mean(fn_draws)
     
     lVol[j] = logdetcholHk #determinant(cholHk)$modulus #-0.5*determinant(Bk)$modulus
-    # log_MASS_c[j] = lVol[j] + log(mean(exp(-fn_draws + mean(fn_draws)))) - 
+    # log_MASS_c[j] = lVol[j] + log(sum(c(unif_weight) * 
+    #                                     (exp(-fn_draws + mean(fn_draws))))) - 
     #   mean(fn_draws)
-    log_MASS_c[j] = lVol[j] + log(sum(c(unif_weight) * 
-                                        (exp(-fn_draws + mean(fn_draws))))) - 
-      mean(fn_draws)
+    log_MASS_c[j] = lVol[j] + 
+      log(mean(exp(lp_f_z2_draws[is.finite(lp_f_z2_draws)] - 
+                     mean(lp_f_z2_draws[is.finite(lp_f_z2_draws)])))) + 
+      mean(lp_f_z2_draws[is.finite(lp_f_z2_draws)])
+    
     if(is.na(log_MASS_c[j]) | is.infinite(log_MASS_c[j])){log_MASS_c[j] = -Inf}
     
     if(min(fn_draws) < fn_center && (j < N_mode_max)){  #tt$value
@@ -433,6 +433,7 @@ opt_path_stan <- function(model, data, N1, N_mode_max, N_sam,
                   lmm = lmm)
   return(out)
 }
+
 #opt_path_stan(model, data, N1, N_rep, init_bound = 2)
 
 opt_path_stan_parallel <- function(seed_list, mc.cores, model, data, 
