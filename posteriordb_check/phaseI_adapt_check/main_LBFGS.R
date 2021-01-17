@@ -53,7 +53,7 @@ factr_tol = 1e2
 #source("../utils/sim_LBFGS_diag_up.R")
 N1 = 300    # Maximum iters in optimization
 N_mode_max = 20 
-N_sam = 100
+N_sam = 1000
 factr_tol = 1e2
 lmm = 5
 MC = 20
@@ -64,12 +64,12 @@ seed_list = 1:20
 
 # parameters settings 17 #
 # all models
-# N1 = 300    # Maximum iters in optimization
-# N_mode_max = 20 
-# N_sam = 100
-# factr_tol = 1e2
-# lmm = 5
-# MC = 20
+N1 = 300    # Maximum iters in optimization
+N_mode_max = 20
+N_sam = 100
+factr_tol = 1e2
+lmm = 100
+MC = 20
 
 # parameters setting 19 #
 # source("../utils/sim_CG_diag_up.R")
@@ -90,7 +90,7 @@ load(file = "../results/lp_posteriordb_LBFGS.RData")
 lp_opath <- c()
 
 which(model_record == 41)
-
+t_0 <- proc.time()
 for(i in 1:length(model_record)){ #length(model_record)
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
@@ -120,10 +120,12 @@ for(i in 1:length(model_record)){ #length(model_record)
   D <- get_num_upars(posterior)
   #lmm = min(as.integer(log(D))*2 + 5, D)
   #lmm = max(lmm, 5)
-  lmm = 5
+  lmm = min(max(D, 5), N1)
+  #lmm = 5
+  lmm = 100
   cat("No. pars:", D," lmm in L-BFGS: ", lmm, "\n")
   
-  #opt_path_stan(model, data, N1 = 30, N_rep = 6, init_bound = 2)
+  # opt_path_stan(model, data, N1 = 30, N_rep = 6, init_bound = 2)
   # opath <- opt_path_stan_parallel(seed_list, mc.cores, model, data,
   #                                 N1, N_mode_max, N_sam,
   #                                 init_bound = 2.0, factr_tol, lmm)
@@ -140,7 +142,14 @@ for(i in 1:length(model_record)){ #length(model_record)
   lp_opath[[i]] <- list(opath = opath, pick_ind = pick_ind)
   
 }
+proc.time() - t_0
 
+#lmm = 5 
+# user  system elapsed 
+# 557.747 273.400 142.419 
+
+# user  system elapsed 
+# 428.165 246.237 130.658 
 
 param_path <- opath[[1]]
 test_ind <- find_typical(opath[[1]], model, data)
@@ -148,7 +157,7 @@ opath[[9]][test_ind, ncol(opath[[9]])]
 init_param_unc <- opath[[1]][22, -ncol(opath[[1]])]
 opath[[3]][39, ncol(opath[[1]])]
 
-# save(file = "../results/lp_posteriordb_phI_adapt_set17.RData",
+# save(file = "../results/lp_posteriordb_phI_adapt_set19.RData",
 #      list = c("lp_opath", "lp_INV", "model_record"))
 
 
@@ -315,7 +324,7 @@ for(i in 1:length(model_record)){ #length(model_record)
     )) + theme_bw() +
     theme(title =element_text(size=16, face='bold'))
   
-  jpeg(filename = paste0("../pics/phI_adapt_setting19/No", model_record[i], "-", 
+  jpeg(filename = paste0("../pics/phI_adapt_setting17/No", model_record[i], "-", 
                          modelname, "_s.jpeg"), #model_record[i]
        width = width, height = height, units = "px", pointsize = 16)
   print(p_lp)
@@ -382,7 +391,7 @@ for(i in 1:length(model_record)){ #length(model_record)
     ))  + theme_bw() +
   theme(title =element_text(size=16, face='bold'))
   
-  jpeg(filename = paste0("../pics/phI_adapt_setting19/No", model_record[i], "-", 
+  jpeg(filename = paste0("../pics/phI_adapt_setting17/No", model_record[i], "-", 
                          modelname, "_trun.jpeg"), #model_record[i]
        width = width, height = height, units = "px", pointsize = 16)
   print(p_lp)
@@ -403,7 +412,7 @@ for(i in 1:length(model_record)){ #length(model_record)
     geom_line(colour = "grey") + geom_point(size = 2) + 
     theme_bw() 
   
-  jpeg(filename = paste0("../pics/phI_adapt_setting19/No", model_record[i], "-", 
+  jpeg(filename = paste0("../pics/phI_adapt_setting17/No", model_record[i], "-", 
                          modelname, "_zlgnorm.jpeg"), #model_record[i]
        width = width, height = height, units = "px", pointsize = 16)
   print(p_lg)
@@ -554,8 +563,8 @@ which(pn == "ovarian-logistic_regression_rhs")
          # min(lp_INV[1, i] - (lp_INV[2, i] - lp_INV[1, i]),
          #        quantile(p_lp_trace$lp__, 0.2))
          #,
-         #max(p_lp_trace$lp__)
-         -2500
+         max(p_lp_trace$lp__)
+         #-2500
          ) + 
     ggtitle(paste("model:", modelname,"\n", "estimated E(lp):", 
                   paste(sapply(lp_opath$opath[chain_id], 
@@ -605,8 +614,8 @@ which(pn == "ovarian-logistic_regression_rhs")
                   )) + theme_bw() +
     theme(title =element_text(size=16, face='bold'))
   
-  jpeg(filename = paste0("../pics/phI_adapt_setting19/No_",
-                         modelname, "_trun2.jpeg"), #model_record[i]
+  jpeg(filename = paste0("../pics/phI_adapt_setting17/No_",
+                         modelname, "_trun2m5.jpeg"), #model_record[i]
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
