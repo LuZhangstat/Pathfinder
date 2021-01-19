@@ -32,7 +32,7 @@ to_posterior <- function(model, data) {
 # sknorm_ls = sknorm_ls, thetak_ls = thetak_ls
 
 
-opt_path <- function(init, fn, gr, lp_f, 
+opt_path <- function(init, fn, gr, 
                      init_bound = 2.0,
                      N1 = 300, N_mode_max = 20, 
                      N_sam = 100, factr_tol = 1e9, lmm = 5) {
@@ -40,23 +40,20 @@ opt_path <- function(init, fn, gr, lp_f,
   #init <- runif(D, -init_bound, init_bound)
   # preallocation
   E_lp <- c()
-  E <- c()
   lVol <- c()
   log_MASS_c <- c()
   step_count = c()
   fn_call = c()     # No. calls to fn
   gr_call = c()     # No. calls to gr
   pareto_k  = c()
-  cond_num = c()
   lgnorms = c()     # log of gradient's norm
   sknorm_ls = c()    # distance of updates
   thetak_ls = c()     # curvature of updates
   
   
-  y <- matrix(NA, nrow = 1, ncol = D + 2)
+  y <- matrix(NA, nrow = 1, ncol = D + 1)
   y[1, 1:D] <- init
-  y[1, D + 1] <- fn(init)
-  y[1, D + 2] <- lp_f(init)
+  y[1, D + 1] <- -fn(init)
   lgnorms <- c(lgnorms, log(sqrt(sum(gr(init)^2))))
   n0 = 1
   for (j in 1:N_mode_max){
@@ -72,17 +69,14 @@ opt_path <- function(init, fn, gr, lp_f,
                       control = list(maxit = N1, factr = factr_tol,
                                      pgtol = 0.0,
                                      #ndeps = 1e-8 #,
-                                     trace = 6, REPORT = 1, lmm = lmm)
-                      #, hessian = TRUE
-                      )
+                                     trace = 6, REPORT = 1, lmm = lmm))
         ), 
          error = function(e) { LBFGS_fail <<- TRUE})
       if(LBFGS_fail){
         for(l in 1:40){
           print("\n reinitialize \n")
           y[n0, 1:D] <- runif(D, -init_bound, init_bound)
-          y[n0, D + 1] <- fn(y[n0, 1:D])
-          y[n0, D + 2] <- lp_f(y[n0, 1:D])
+          y[n0, D + 1] <- -fn(y[n0, 1:D])
           lgnorms <- c(lgnorms[-length(lgnorms)], 
                        log(sqrt(sum(gr(y[n0, 1:D])^2))))
           LBFGS_fail <- FALSE
@@ -93,11 +87,8 @@ opt_path <- function(init, fn, gr, lp_f,
                         method = "L-BFGS-B",
                         control = list(maxit = N1, factr = factr_tol, #ndeps = 1e-8 #,
                                        pgtol = 0.0,
-                                       trace = 6, REPORT = 1, lmm = lmm)
-                        #, hessian = TRUE
-                        )
-          ), 
-                   error = function(e) { LBFGS_fail <<- TRUE})
+                                       trace = 6, REPORT = 1, lmm = lmm))
+          ), error = function(e) { LBFGS_fail <<- TRUE})
           if(!LBFGS_fail){break}
         }
       }
@@ -110,21 +101,16 @@ opt_path <- function(init, fn, gr, lp_f,
                     method = "L-BFGS-B",
                     control = list(maxit = N1, factr = factr_tol, #ndeps = 1e-8 #,
                                    pgtol = 0.0, 
-                                   trace = 6, REPORT = 1, lmm = lmm)
-                    #, hessian = TRUE
-                    )
-      ), 
-               error = function(e) { LBFGS_fail <<- TRUE})
+                                   trace = 6, REPORT = 1, lmm = lmm))
+      ), error = function(e) { LBFGS_fail <<- TRUE})
     }
-    
     
     if(LBFGS_fail){
       if(j == 1){
         E_lp[1] <- NA
-        E[1] <- NA
         y = y
-        return(list(E_lp = E_lp, E = E, lVol = lVol, log_MASS_c = log_MASS_c, 
-                    pareto_k = pareto_k, cond_num = cond_num, 
+        return(list(E_lp = E_lp, lVol = lVol, log_MASS_c = log_MASS_c, 
+                    pareto_k = pareto_k,  
                     y = y, step_count = step_count, fn_call = fn_call, 
                     gr_call = gr_call, lgnorms = lgnorms, 
                     sknorm_ls = sknorm_ls, thetak_ls = thetak_ls))
@@ -169,9 +155,8 @@ opt_path <- function(init, fn, gr, lp_f,
     
     
     # save results
-    lp_ls <- apply(X, 1, lp_f)
     fn_ls <- apply(X, 1, fn)
-    y = rbind(y, cbind(X, fn_ls, lp_ls))
+    y = rbind(y, cbind(X, -fn_ls))
     step_count[j] <- tt$counts[1]
     fn_call[j] <- tt$counts[1]
     gr_call[j] <- tt$counts[2]
@@ -179,15 +164,13 @@ opt_path <- function(init, fn, gr, lp_f,
     
     if(center_ind < 3){
       print("on the edge of funnel")
-      E_lp[j] = lp_ls[center_ind];
-      E[j] = fn_ls[center_ind];
+      E_lp[j] = -fn_ls[center_ind];
       lVol[j] = -Inf
       log_MASS_c[j] = -Inf
       pareto_k[j] = -Inf
-      cond_num[j] = NA
       
-      return(list(E_lp = E_lp, E = E, lVol = lVol, log_MASS_c = log_MASS_c, 
-                  pareto_k = pareto_k, cond_num = cond_num, 
+      return(list(E_lp = E_lp, lVol = lVol, log_MASS_c = log_MASS_c, 
+                  pareto_k = pareto_k, 
                   y = y, step_count = step_count, fn_call = fn_call, 
                   gr_call = gr_call, lgnorms = lgnorms, 
                   sknorm_ls = sknorm_ls, thetak_ls = thetak_ls))
@@ -240,9 +223,6 @@ opt_path <- function(init, fn, gr, lp_f,
     thetak = thetak[(lDk - m + 1):lDk]
     
     ## take off sharp updates ##
-    #lskupn = min(as.integer(log(D)) * 3 + 5, 2 * D)
-    #lskupn = max(lskupn, 10)
-    #lmm = max(lmm, 5)
     theta_sm <- c()
     small_lsk_ind <- c()
     if(m >= 10){ # if m >= 10 # m > lskupn
@@ -286,17 +266,15 @@ opt_path <- function(init, fn, gr, lp_f,
     
     if( 2*m >= D){
       # directly calculate inverse Hessian and the cholesky decomposition
-      Hk = diag(c(1 / theta_D), nrow = D) + 
-        crossprod(Ykt %*% diag(1/(theta_D), nrow = D), ninvRST) + 
-        crossprod(ninvRST, Ykt %*% diag(1/(theta_D), nrow = D))  + 
+      Hk = diag(c(inv_theta_D), nrow = D) + 
+        crossprod(Ykt %*% diag(inv_theta_D, nrow = D), ninvRST) + 
+        crossprod(ninvRST, Ykt %*% diag(inv_theta_D, nrow = D))  + 
         crossprod(ninvRST, 
                   (diag(Dk) + 
-                     tcrossprod(Ykt %*% diag(1/sqrt(theta_D), nrow = D))) %*% 
+                     tcrossprod(Ykt %*% diag(sqrt(inv_theta_D), nrow = D))) %*% 
                     ninvRST)
       cholHk = chol(Hk)
       logdetcholHk = determinant(cholHk)$modulus
-      eigen_v = eigen(Hk)$values
-      cond_num[j] = eigen_v[1]/eigen_v[length(eigen_v)]
       u = matrix(rnorm(D * N_sam), ncol = N_sam)
       u2 = crossprod(cholHk, u) + x_center
       
@@ -310,20 +288,20 @@ opt_path <- function(init, fn, gr, lp_f,
       
     } else {
        # use equation ?? to sample
-      Wkbart = rbind(Ykt%*%diag(1/sqrt(theta_D)), ninvRST%*%diag(sqrt(theta_D)))
+      Wkbart = rbind(Ykt %*% diag(sqrt(inv_theta_D)), 
+                     ninvRST %*% diag(sqrt(theta_D)))
       Mkbar = rbind(cbind(matrix(0.0, nrow = m, ncol = m), diag(m)),
                     cbind(diag(m), 
-                          (diag(Dk) + tcrossprod(Ykt%*%diag(1/sqrt(theta_D))))))
+                          (diag(Dk) + 
+                             tcrossprod(Ykt %*% diag(sqrt(inv_theta_D))))))
       qrW = qr(t(Wkbart))
       Qk = qr.Q(qrW)
       Rkbar = qr.R(qrW)
       Rktilde = chol(Rkbar %*% Mkbar %*% t(Rkbar) + diag(nrow(Rkbar)))
       logdetcholHk = sum(log(diag(Rktilde))) - 0.5 * sum(log(theta_D))
-      eigen_v = NA
-      cond_num[j] = NA
       u = matrix(rnorm(D * N_sam), ncol = N_sam)
       u1 = crossprod(Qk, u)
-      u2 = diag(1/sqrt(theta_D)) %*% 
+      u2 = diag(sqrt(inv_theta_D)) %*% 
         (Qk %*% crossprod(Rktilde, u1) + (u - Qk %*% u1)) + x_center
       
       # generate the samples uniformly from the region x^T H^{-1} x < qchisq(0.95, D)
@@ -340,7 +318,6 @@ opt_path <- function(init, fn, gr, lp_f,
     
     fn_draws <-  c()
     ind_draws <- c()
-    lp_f_draws <- c()
     lp_approx_draws <- c()
     lp_f_z2_draws <- c() # records the log_density of samples uniformly from
                          # the 95% CI of approximating Gaussian
@@ -355,10 +332,9 @@ opt_path <- function(init, fn, gr, lp_f,
         
         ind_draws <- c(ind_draws, l)
         fn_draws <- c(fn_draws, f_test)
-        lp_f_draws <- c(lp_f_draws, lp_f(u2[, l]))
         lp_approx_draws <- c(lp_approx_draws, - logdetcholHk - 
                                0.5 * sum(u[, l]^2))
-        lp_f_z2_draws <- c(lp_f_z2_draws, lp_f(z2[, l]))
+        lp_f_z2_draws <- c(lp_f_z2_draws, -fn(z2[, l]))
       }
     }
     fn_call[j] = fn_call[j] + N_sam
@@ -367,16 +343,13 @@ opt_path <- function(init, fn, gr, lp_f,
       keep_ind = which(is.finite(fn_draws))
       fn_draws = fn_draws[keep_ind]
       lp_approx_draws = lp_approx_draws[keep_ind]
-      lp_f_draws = lp_f_draws[keep_ind]
     } 
     lp_ratios = - fn_draws - lp_approx_draws 
     psis_test = psis(lp_ratios, r_eff = 1)
     pareto_k[j] = pareto_k_values(psis_test)
-    #unif_weight <- weights(psis(-lp_approx_draws, r_eff = 1), log = FALSE)
-    
-    E_lp[j] = sum(c(weights(psis_test, log = FALSE)) * lp_f_draws) #mean(lp_f_draws)
-    E[j] = sum(c(weights(psis_test, log = FALSE)) * fn_draws) #mean(fn_draws)
-    
+
+    E_lp[j] = sum(c(weights(psis_test, log = FALSE)) * -fn_draws) #mean(lp_f_draws)
+
     lVol[j] = logdetcholHk #determinant(cholHk)$modulus #-0.5*determinant(Bk)$modulus
     # log_MASS_c[j] = lVol[j] + log(sum(c(unif_weight) * 
     #                                     (exp(-fn_draws + mean(fn_draws))))) - 
@@ -391,15 +364,15 @@ opt_path <- function(init, fn, gr, lp_f,
     if(min(fn_draws) < fn_center && (j < N_mode_max)){  #tt$value
       n0 <- nrow(y) + 1
       init <- u2[, which.min(fn_draws)]
-      y = rbind(y, c(init, fn(init), lp_f(init)))
+      y = rbind(y, c(init, -fn(init)))
       lgnorms = c(lgnorms, log(sum(gr(init)^2)))
     } else {
       break
     }
   }
   #E_lp
-  return(list(E_lp = E_lp, E = E, lVol = lVol, log_MASS_c = log_MASS_c, 
-              pareto_k = pareto_k, cond_num = cond_num, 
+  return(list(E_lp = E_lp, lVol = lVol, log_MASS_c = log_MASS_c, 
+              pareto_k = pareto_k,  
               y = y, step_count = step_count, fn_call = fn_call, 
               gr_call = gr_call, lgnorms = lgnorms, 
               sknorm_ls = sknorm_ls, thetak_ls = thetak_ls))
@@ -425,10 +398,10 @@ opt_path_stan <- function(model, data, N1, N_mode_max, N_sam,
   init <- runif(D, -init_bound, init_bound)
   fn <- function(theta) -log_prob(posterior, theta, adjust_transform = TRUE, 
                                  gradient = TRUE)[1] 
-  gr <- function(theta) -grad_log_prob(posterior, theta, adjust_transform = TRUE)
-  lp_f <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
-                                 gradient = TRUE)[1]
-  out <- opt_path(init, fn = fn, gr = gr, lp_f = lp_f, N1 = N1,
+  gr <- function(theta) -grad_log_prob(posterior, theta, 
+                                       adjust_transform = TRUE)
+  
+  out <- opt_path(init, fn = fn, gr = gr, N1 = N1,
                   N_mode_max = N_mode_max, N_sam = N_sam, factr_tol = factr_tol,
                   lmm = lmm)
   return(out)
@@ -443,16 +416,16 @@ opt_path_stan_parallel <- function(seed_list, mc.cores, model, data,
   D <- get_num_upars(posterior)
   fn <- function(theta) -log_prob(posterior, theta, adjust_transform = TRUE, 
                                  gradient = TRUE)[1]
-  gr <- function(theta) -grad_log_prob(posterior, theta, adjust_transform = TRUE)
-  lp_f <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
-                                   gradient = TRUE)[1]
+  gr <- function(theta) -grad_log_prob(posterior, theta, 
+                                       adjust_transform = TRUE)
+
   MC = length(seed_list)
   init = c()
   for(i in 1:MC){
     set.seed(seed_list[i])
     init[[i]] <- runif(D, -init_bound, init_bound)
   }
-  out <- mclapply(init, opt_path, fn = fn, gr = gr, lp_f = lp_f, N1 = N1,
+  out <- mclapply(init, opt_path, fn = fn, gr = gr, N1 = N1,
                   N_mode_max = N_mode_max, N_sam = N_sam, factr_tol = factr_tol,
                   lmm = lmm, mc.cores = mc.cores)
 }
@@ -464,10 +437,9 @@ opt_path_stan_init_parallel <- function(init_ls, mc.cores, model, data,
   D <- get_num_upars(posterior)
   fn <- function(theta) -log_prob(posterior, theta, adjust_transform = TRUE, 
                                   gradient = TRUE)[1]
-  gr <- function(theta) -grad_log_prob(posterior, theta, adjust_transform = TRUE)
-  lp_f <- function(theta) log_prob(posterior, theta, adjust_transform = TRUE, 
-                                   gradient = TRUE)[1]
-  out <- mclapply(init_ls, opt_path, fn = fn, gr = gr, lp_f = lp_f, N1 = N1,
+  gr <- function(theta) -grad_log_prob(posterior, theta, 
+                                       adjust_transform = TRUE)
+  out <- mclapply(init_ls, opt_path, fn = fn, gr = gr, N1 = N1,
                   N_mode_max = N_mode_max, N_sam = N_sam, factr_tol = factr_tol,
                   lmm = lmm, mc.cores = mc.cores)
 }
@@ -487,13 +459,25 @@ params_only <- function(path) {
 
 find_indx <- function(param_path) {
   mode_ind = which.max(param_path$log_MASS_c)
-  E_target = param_path$E[mode_ind]
-  mark_index = which.min(abs(param_path$y[, (ncol(param_path$y) - 1)] - E_target))
-  mark_index2 = which.min(abs(param_path$y[, (ncol(param_path$y))] - 
+  E_target = param_path$E_lp[mode_ind]
+  mark_index = which.min(abs(param_path$y[, (ncol(param_path$y))] - 
                                 param_path$E_lp[mode_ind]))
-  
-  return(mark_index2)
+  return(mark_index)
 }
+
+fit_info <- function(param_path) {
+  # extract fitting information #
+  
+  mode_ind = which.max(param_path$log_MASS_c)
+  E_target = param_path$E_lp[mode_ind]
+  mark_index = which.min(abs(param_path$y[, (ncol(param_path$y))] - E_target))
+  log_MASS_c = param_path$log_MASS_c[mode_ind]
+  pareto_k = param_path$pareto_k[mode_ind]
+  
+  return(c(log_MASS_c, pareto_k, E_target))
+}
+
+
 
 # library('rstan')
 # program <-
