@@ -9,6 +9,8 @@ rstan_options(auto_write = TRUE)
 library(posteriordb)
 library(posterior)
 library(ggplot2)
+library(cmdstanr)
+library(bayesplot)
 source("../utils/sim.R")
 source("../utils/lp_utils.R")
 
@@ -25,37 +27,16 @@ width = 600; height = 500 # the size of the plot
 mc.cores = parallel::detectCores() - 2
 sample_seed = 1234
 
-# pick models #
-takeoff <- c(21, 24)
-N_models = 0
-model_record = c()
-for(l in 1:L_pn){
-  if(any(l == takeoff)){next}
-  modelname <- pn[l]
-  
-  # pick model
-  po <- posterior(modelname, pdb = pd)
-  # get reference posterior samples
-  skip_to_next <- FALSE
-  tryCatch(gsd <- reference_posterior_draws(po),
-           error = function(e) { skip_to_next <<- TRUE})
-  if(skip_to_next) {
-    # print("Error in obtaining reference posterior for this posterior.")
-    next }
-  N_models = N_models + 1
-  model_record = c(model_record, l)
-  printf("model %d: %s", l, modelname)
-}
-N_models
+load(file = "../results/lp_posteriordb_LBFGS.RData")
 
 # preallocate results #
 lp_explore_n_iters <- array(data = NA, dim = c(M, length(model_record)))
 lp_explore_n_leapfrog <- array(data = NA, dim = c(M, length(model_record)))
-lp_INV <- array(data = NA, dim = c(2, length(model_record)))
-lp_mean <- c()
 lp_data <- c()
+PhaseI_last_draw <- list() # Get the last samples of Phase I
 
-for(i in 1:length(model_record)){
+i = which(model_record == 27)
+for(i in 1:49){ #20 length(model_record)
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   # pick model
@@ -66,37 +47,62 @@ for(i in 1:length(model_record)){
   # compile the model
   sc <- stan_code(po)
   model <- stan_model(model_code = sc)
-  # obtain posterior interval of lp__
-  INV <- lp_Int_q_posteriordb(po, alpha)
-  lp_INV[, i] = INV[c(1, 2)]
-  lp_mean[i] = INV[3] 
+  
+  ### setup initials ###
+  data = get_data(po)
+  posterior <- to_posterior(model, data)
+  init = lapply(initial_ls[[i]], f <- function(x){constrain_pars(posterior, x)})
+  
   ###  run Stan with a long Phase I warmup time  ###
+  file <- file.path(getwd(), "modelcode", paste0(modelname, ".stan"))
+  mod <- cmdstan_model(file)
+  
+  ###  random inits  ###
   suppressWarnings(
-    phiI_sample <- sampling(model, data = get_data(po), 
-                          seed = sample_seed,
-                          iter = L + 1, 
-                          warmup = L,
-                          chains = M, 
-                          cores = mc.cores,
-                          algorithm ="NUTS",
-                          control = list(adapt_init_buffer = L,
-                                         adapt_term_buffer = 0,
-                                         adapt_window = 0),
-                          save_warmup = TRUE, 
-                          refresh = 0))
+    fit <- mod$sample(
+      data = data,
+      seed = 123,
+      init = init,
+      chains = M,
+      parallel_chains = 5,
+      refresh = 0,
+      save_warmup = TRUE,
+      iter_warmup = L,
+      iter_sampling = 0,
+      init_buffer = L,
+      term_buffer = 0,
+      show_messages = FALSE,
+      sig_figs = 16
+    ))
+  p1 <- mcmc_trace(fit$draws("lp__", inc_warmup = TRUE)[60:80, ,]) #c("lp__", "phi[1]", "lambda[1]", "theta1[1]")
+  print(p1)
+  
+  ## record the initial and the last sample of phase I ##
+  fit_draws <- fit$draws(inc_warmup = TRUE)
+  last_pI_draws <- matrix(fit_draws[75, , ], 
+                          nrow = dim(fit_draws)[2])
+  colnames(last_pI_draws) <- dimnames(fit_draws)$variable
+  unconstrained_draws <- unconstrain_cmd_draws(last_pI_draws, posterior)
+  PhaseI_last_draw[[i]] <- unconstrained_draws # record the last sample of phase I
   
   ###  record the number of iterations required to reach INV ###
   # Get the number of iterations and  leapfrogs #
-  lp_explore_sum <- lp_explore(phiI_sample, INV, L, M)
+  lp_explore_sum <- lp_explore(fit, lp_INV[, i], L, M, model, data)
   lp_explore_n_iters[, i] = lp_explore_sum$n_iters
   lp_explore_n_leapfrog[, i] = lp_explore_sum$n_sum_leapfrog
   printf("the maximum iter to reach %.1f %% posterior interval of lp__ is %d",
-        (1.0 - alpha) * 100, max(lp_explore_sum$n_iters))
+         (1.0 - alpha) * 100, max(lp_explore_sum$n_iters))
   printf("the average leapfrogs is %.2f, sd is %.2f", 
          mean(lp_explore_sum$n_sum_leapfrog), sd(lp_explore_sum$n_sum_leapfrog))
   
+  
   # check the trace plot of lp__ #
-  lp_phI <- ls_lp_phI(phiI_sample, L)
+  pos_d <- list()
+  for(ll in 1:dim(fit_draws)[2]){
+    pos_d[[ll]] <- as.data.frame(fit_draws[, ll, -1])
+  }
+  lp_phI <- lp_recover(model, data, pos_d)
+  
   L_p = L
   p_lp_trace = data.frame(iter = rep(1:L_p, M), 
                           chain = rep(paste(1:M), each = L_p),
@@ -105,10 +111,11 @@ for(i in 1:length(model_record)){
   lp_data[[i]] <- p_lp_trace 
   
   p_lp_s <- ggplot(data = p_lp_trace, 
-                 aes(x=iter, y=lp__, group=chain, color=chain)) + geom_line() +
-    geom_hline(yintercept = INV[c(1, 2)]) + 
-    geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") + 
-    ylim(INV[1] - 1.5*(INV[2] - INV[1]), INV[2] + 1*(INV[2] - INV[1])) + 
+                   aes(x=iter, y=lp__, group=chain, color=chain)) + geom_line() +
+    geom_hline(yintercept = lp_INV[, i]) + 
+    geom_hline(yintercept = lp_mean[i], linetype = 2, colour = "blue") + 
+    ylim(lp_INV[1, i] - 1.5*(lp_INV[2, i] - lp_INV[1, i]), 
+         lp_INV[2, i] + 1*(lp_INV[2, i] - lp_INV[1, i])) + 
     ggtitle(paste("model:", modelname)) + theme_bw() 
   jpeg(filename = paste0("../pics/phI_stan/No", model_record[i], "-", 
                          modelname, "_s.jpeg"),
@@ -119,8 +126,8 @@ for(i in 1:length(model_record)){
   p_lp_L <- ggplot(data = p_lp_trace, 
                    aes(x=iter, y=lp__, group=chain, color=chain)) + 
     geom_line() +
-    geom_hline(yintercept = INV[c(1, 2)]) + 
-    geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") + 
+    geom_hline(yintercept = lp_INV[, i]) + 
+    geom_hline(yintercept = lp_mean[i], linetype = 2, colour = "blue") + 
     ggtitle(paste("model:", modelname)) + theme_bw() 
   jpeg(filename = paste0("../pics/phI_stan/No", model_record[i], "-", 
                          modelname, "_L.jpeg"),
@@ -129,12 +136,14 @@ for(i in 1:length(model_record)){
   dev.off()
   
   p_lp <- ggplot(data = p_lp_trace, 
-                   aes(x=iter, y=lp__, group=chain, color=chain)) + 
+                 aes(x=iter, y=lp__, group=chain, color=chain)) + 
     geom_line() +
-    geom_hline(yintercept = INV[c(1, 2)]) + 
-    geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") +
-    ylim(min(INV[1] - 2*(INV[2] - INV[1]), quantile(p_lp_trace$lp__, 0.05)),
-         max(INV[2] + 1*(INV[2] - INV[1]), max(p_lp_trace$lp__))) + 
+    geom_hline(yintercept = lp_INV[, i]) + 
+    geom_hline(yintercept = lp_mean[i], linetype = 2, colour = "blue") +
+    ylim(min(lp_INV[1, i] - 2*(lp_INV[2, i] - lp_INV[1, i]), 
+             quantile(p_lp_trace$lp__, 0.05)),
+         max(lp_INV[2, i] + 1*(lp_INV[2, i] - lp_INV[1, i]), 
+             max(p_lp_trace$lp__))) + 
     ggtitle(paste("model:", modelname)) + theme_bw() 
   jpeg(filename = paste0("../pics/phI_stan/No", model_record[i], "-", 
                          modelname, ".jpeg"),
@@ -151,109 +160,70 @@ for(i in 1:length(model_record)){
   p_lp <- ggplot(data = p_lp_trace, 
                  aes(x=iter, y=lp__, group=chain, color=chain)) + 
     geom_line() +
-    geom_hline(yintercept = INV[c(1, 2)]) + 
-    geom_hline(yintercept = INV[3], linetype = 2, colour = "blue") +
-    ylim(min(INV[1] - 2*(INV[2] - INV[1]), quantile(p_lp_trace$lp__, 0.15)),
-         max(INV[2] + 1*(INV[2] - INV[1]), max(p_lp_trace$lp__))) + 
+    geom_hline(yintercept = lp_INV[, i]) + 
+    geom_hline(yintercept = lp_mean[i], linetype = 2, colour = "blue") +
+    ylim(min(lp_INV[1, i] - 2*(lp_INV[2, i] - lp_INV[1, i]), 
+             quantile(p_lp_trace$lp__, 0.15)),
+         max(lp_INV[2, i] + 1*(lp_INV[2, i] - lp_INV[1, i]), 
+             max(p_lp_trace$lp__))) + 
     ggtitle(paste("model:", modelname)) + theme_bw() 
   jpeg(filename = paste0("../pics/phI_stan/No", model_record[i], "-", 
                          modelname, "_trun.jpeg"),
        width = width, height = height, units = "px", pointsize = 12)
   print(p_lp)
   dev.off()
-  
 }
 
-# save(file = "../results/lp_posteriordb_explore3.RData",
-#      list = c("lp_explore_n_iters", "lp_explore_n_leapfrog",
-#               "lp_INV", "lp_mean", "lp_data"))
-# 
+save(file = "../results/lp_posteriordb_explore.RData",
+     list = c("lp_explore_n_iters", "lp_explore_n_leapfrog", "lp_data", 
+              "PhaseI_last_draw"))
+
 # load("../results/lp_posteriordb_explore.RData")
-## check reference posterior ##
-N_models = 0
-model_record = c()
-for(l in 1:L_pn){
-  modelname <- pn[l]
-  # printf("model %d: %s", l, modelname)
-
-  # pick model
-  po <- posterior(modelname, pdb = pd)
-  # get reference posterior samples
-  skip_to_next <- FALSE
-  tryCatch(gsd <- reference_posterior_draws(po),
-           error = function(e) { skip_to_next <<- TRUE})
-  if(skip_to_next) {
-    # print("Error in obtaining reference posterior for this posterior.")
-    next }
-  N_models = N_models + 1
-  model_record = c(model_record, l)
-}
-N_models
-# only 49 out of 97 models have reference posterior samples
-
-## check the transformed parameters block ##
-# for(id in model_record){
-id = 24
-  cat("id:", id)
-  po <- posterior(pn[id], pdb = pd)
-  sc <- stan_code(po)
-  print(sc)
-  gsd <- reference_posterior_draws(po)
-  tt <- sapply(gsd[[1]], unlist)
-  tt[1, ]
-  
-  model <- stan_model(model_code = sc)
-  data <- get_data(po)
-  posterior <- to_posterior(model, data)
-  get_inits(posterior)[[1]] 
-  # readline(prompt="Press [enter] to continue")
-# }
-# 21, 24 does not match
-takeoff <- c(21, 24)
 
 ## check the distribution of number of iterations ##
-n_iters_mean <- colMeans(lp_explore_n_iters[, -takeoff])
-mean(n_iters_mean, na.rm = TRUE) # 69.11596
-median(lp_explore_n_iters[, -takeoff], na.rm = TRUE) # 26
-sd(n_iters_mean, na.rm = TRUE)   # 144.9198
-sd(lp_explore_n_iters[, -takeoff], na.rm = TRUE) # 159.7554
+n_iters_mean <- colMeans(lp_explore_n_iters)
+mean(n_iters_mean, na.rm = TRUE) # 64.78
+median(lp_explore_n_iters, na.rm = TRUE) # 26
+sd(n_iters_mean, na.rm = TRUE)   # 141.2
+sd(lp_explore_n_iters, na.rm = TRUE) # 142.45
 jpeg(filename = paste0("../pics/hist_iters.jpeg"),
      width = width, height = height, units = "px", pointsize = 12)
-hist(lp_explore_n_iters[, -takeoff], breaks = 100, 
+hist(lp_explore_n_iters, breaks = 100, 
      main = "", ylab = "", axes = TRUE,
      xlab = "iterations")
 dev.off()
 
 
-#' Around 95.9% of phase I MCMC chains reach the target interval within 200 '
+#' Around 96.7% of phase I MCMC chains reach the target interval within 200 '
 #' iterations. 
-sum((lp_explore_n_iters[, -takeoff] <= 200), na.rm = TRUE) / 
-  sum(!is.na(lp_explore_n_iters[, -takeoff]))
+sum((lp_explore_n_iters <= 200), na.rm = TRUE) / 
+  sum(!is.na(lp_explore_n_iters))
 
-#' The 9th, 24th, 27th, 40th and 41th model have phase I MCMC chains
+#' The 3th, 9th, and 41th model have phase I MCMC chains
 #' fail to reach the target interval within 1000 iters
-table(as.integer(which(lp_explore_n_iters == L) / M - 0.5 / M) + 1)
-# 9 24 27 40 41 
-# 20 20  1  1  1 
+table(model_record[as.integer(which(lp_explore_n_iters == L) / M - 0.5 / M) 
+                   + 1])
+# 3  9 41 
+# 1 20  1  
 
 
 ## check the distribution of sum of leapfrogs ##
-n_leapfrog_mean <- colMeans(lp_explore_n_leapfrog[, -takeoff])
-mean(n_leapfrog_mean, na.rm = TRUE) # 18013.83
-median(lp_explore_n_leapfrog[, -takeoff], na.rm = TRUE) # 645.5
-sd(n_leapfrog_mean, na.rm = TRUE)   # 94313.19
-sd(lp_explore_n_leapfrog[, -takeoff], na.rm = TRUE) # 98874.89
+n_leapfrog_mean <- colMeans(lp_explore_n_leapfrog)
+mean(n_leapfrog_mean, na.rm = TRUE) # 16451.39
+median(lp_explore_n_leapfrog, na.rm = TRUE) # 612
+sd(n_leapfrog_mean, na.rm = TRUE)   # 91797.28
+sd(lp_explore_n_leapfrog, na.rm = TRUE) # 91020.25
 jpeg(filename = paste0("../pics/hist_leapfrogs.jpeg"),
      width = width, height = height, units = "px", pointsize = 12)
-hist(lp_explore_n_leapfrog[, -takeoff], breaks = 200, 
+hist(lp_explore_n_leapfrog, breaks = 200, 
      main = "No. leapfrogs to reach target interval",
      xlab = "leapfrogs")
 dev.off()
 
 jpeg(filename = paste0("../pics/hist_leapfrogs_log.jpeg"),
      width = width/2, height = height/2, units = "px", pointsize = 12)
-df <- data.frame(sum_leapfrog = c(lp_explore_n_leapfrog[, -takeoff][
-  !is.na(lp_explore_n_leapfrog[, -takeoff])]))
+df <- data.frame(sum_leapfrog = c(lp_explore_n_leapfrog[
+  !is.na(lp_explore_n_leapfrog)]))
 p_leapfrog <- ggplot(data =df , aes(x = sum_leapfrog)) +
   geom_histogram(color="black", fill="white", bins = 60) + scale_x_log10() +
   xlab("No. of leapfrogs") 
@@ -262,50 +232,46 @@ print(p_leapfrog)
 dev.off()
 
 
-#' Around 80.1% of phase I MCMC chains spend less than 4000
+#' Around 80.6% of phase I MCMC chains spend less than 4000
 #' leapfrogs for lp__ to reach the 99% posterior interval.
-sum((lp_explore_n_leapfrog[, -takeoff] <= 4000), na.rm = TRUE) / 
-  sum(!is.na(lp_explore_n_leapfrog[, -takeoff]))
-mean(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_leapfrog[, -takeoff] < 4e3)])
-#[1] 852.5551
-median(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_leapfrog[, -takeoff] < 4e3)])
-# [1] 385
-sd(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_leapfrog[, -takeoff] < 4e3)])
-#[1] 958.3538
+sum((lp_explore_n_leapfrog <= 4000), na.rm = TRUE) / 
+  sum(!is.na(lp_explore_n_leapfrog))
+mean(lp_explore_n_leapfrog[which(lp_explore_n_leapfrog < 4e3)])
+#[1] 836.3392
+median(lp_explore_n_leapfrog[which(lp_explore_n_leapfrog < 4e3)])
+# [1] 370.5
+sd(lp_explore_n_leapfrog[which(lp_explore_n_leapfrog < 4e3)])
+#[1] 957.9834
 
 
-#' Around 96.7% of phase I MCMC chains spend less than 30,000
+#' Around 96.6% of phase I MCMC chains spend less than 30,000
 #' leapfrogs for lp__ to reach the 99% posterior interval
-sum((lp_explore_n_leapfrog[, -takeoff] <= 3e4), na.rm = TRUE) / 
-  sum(!is.na(lp_explore_n_leapfrog[, -takeoff]))
+sum((lp_explore_n_leapfrog <= 3e4), na.rm = TRUE) / 
+  sum(!is.na(lp_explore_n_leapfrog))
 
-mean(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_iters[, -takeoff] < 200)])
-# [1] 2964.708
-median(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_iters[, -takeoff] < 200)])
-# [1] 541
-sd(lp_explore_n_leapfrog[, -takeoff][which(lp_explore_n_iters[, -takeoff] < 200)])
-# [1] 6041.258
+mean(lp_explore_n_leapfrog[which(lp_explore_n_iters < 200)])
+# [1] 3214.378
+median(lp_explore_n_leapfrog[which(lp_explore_n_iters < 200)])
+# [1] 557
+sd(lp_explore_n_leapfrog[which(lp_explore_n_iters < 200)])
+# [1] 6959.813
 
-#' The 3th, 9th, 10th, 14th, 24th, 27th and 37th model have phase I MCMC chains
+#' The 3th, 9th, 14th and 37th model have phase I MCMC chains
 #' fail to reach the target interval within 30,000 leapfrogs
-table(as.integer(which(lp_explore_n_leapfrog > 3e4) / M - 0.5 / M) + 1)
-# 3  9 10 14 24 27 37 
-# 1 20  1  2 20  1  6
+table(model_record[as.integer(which(lp_explore_n_leapfrog > 3e4) / M - 0.5 / M) 
+                   + 1])
+# 3  9 11 14 37 
+# 1 20  3  1  8
 
 
 #' check the histogram of number of leapfrogs, distribution of the sum of 
 #' leapfrogs before reaching target interval is highly right skewed
 lp_explore_n_leapfrog[which(lp_explore_n_leapfrog >= 1e4 & 
                               lp_explore_n_iters < 300)]
-# [1] 13832 18261 20524 17962 17129 16521 18351 17628 31223 18166 14796 14512 13169 16890
-# [15] 27862 14286 21736 13788 23826 20992 15102 10537 17369 20708 22096 19912 14466 13913
-# [29] 11544 15548 14767 11165 17868 12032 13170 13517 14020 23162 13882 19798 24102 25818
-# [43] 29549 38597 19325 17157 21132 22461 26490 14364 19821 13795 13267 17174 35202 19989
-# [57] 12834 18480 34095 26612 60107 21014 26124 12589 10878 16461 12443 24980 38539 33636
-# [71] 25617 37588 28496 15163 40488 17515 19067 10190 13982 11008 14914 13890
-table(as.integer(which(lp_explore_n_leapfrog >= 1e4 & 
-                         lp_explore_n_iters < 300)/M - 0.5/M) + 1)
+table(model_record[as.integer(which(lp_explore_n_leapfrog >= 1e4 & 
+                                      lp_explore_n_iters < 300)/M - 0.5/M) + 1])
 
 # 4 10 11 12 14 37 48 
 # 2 10 18  9 19 17  7 
+
 
