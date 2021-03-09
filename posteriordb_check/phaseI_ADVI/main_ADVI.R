@@ -31,6 +31,7 @@ load(file = "../results/lp_posteriordb_LBFGS.RData")
 
 # preallocate results #
 ADVI_meanfield_draw <- list() 
+ADVI_meanfield_center <- list() 
 ADVI_fullrank_draw <- list() 
 
 ## check meanfield ##
@@ -77,6 +78,7 @@ for(i in 1:length(model_record)){
       print(summary(fit_ADVI$lp()))
       unconstrained_draws <- unconstrain_cmdstan_vb(model, data, fit_ADVI)
       ADVI_meanfield_draw[[i]] <- unconstrained_draws # record the last sample of phase I
+      ADVI_meanfield_center[[i]] <-  colMeans(unconstrained_draws)
       break
     }
   }
@@ -133,4 +135,5 @@ for(i in 1:length(model_record)){
 
 
 save(file = "../results/ADVI_results.RData",
-     list = c("ADVI_meanfield_draw", "ADVI_fullrank_draw"))
+     list = c("ADVI_meanfield_draw", "ADVI_meanfield_center",
+              "ADVI_fullrank_draw"))

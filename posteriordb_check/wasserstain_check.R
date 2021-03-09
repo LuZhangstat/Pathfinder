@@ -6,7 +6,7 @@ load("../results/lp_posteriordb_explore.RData") # phase I output
 load("../results/ADVI_results.RData") # ADVI results
 
 ## calculate wasserstain distance ##
-w_d_matrix = matrix(NA, nrow = 49, ncol = 6)
+w_d_matrix = matrix(NA, nrow = 49, ncol = 7)
 t_0 <- proc.time()
 for(i in 1:49){ #length(model_record)
   modelname <- pn[model_record[i]]
@@ -84,6 +84,12 @@ for(i in 1:49){ #length(model_record)
                          nrow(ADVI_meanfield_draw[[i]][1:20, ])))
   w_d_ADVI_mf <- wasserstein(a_ADVI_mf, b, p = 2); w_d_ADVI_mf
   
+  # ADVI: meanfield center#
+  a_ADVI_mfc = wpp(rbind(ADVI_meanfield_center[[i]], 
+                        ADVI_meanfield_center[[i]]),
+                  mass = rep(1 / 2, 2))
+  w_d_ADVI_mfc <- wasserstein(a_ADVI_mfc, b, p = 2); w_d_ADVI_mfc
+  
   # ADVI: fullrank #
   a_ADVI_fr = wpp(ADVI_fullrank_draw[[i]][1:20, ],
                   mass = rep(1 / nrow(ADVI_fullrank_draw[[i]][1:20, ]),
@@ -92,12 +98,13 @@ for(i in 1:49){ #length(model_record)
   
   
   w_d_matrix[i, ] = c(w_d_pf, w_d_opt, w_d_init, w_d_phI, w_d_ADVI_mf, 
-                      w_d_ADVI_fr)
+                      w_d_ADVI_mfc, w_d_ADVI_fr)
   
   cat("pf:", w_d_pf, "\t", "optims: ", w_d_opt, "\t", 
       "inits: ", w_d_init, "phI:", w_d_phI, "\n", 
-      "ADVI meanfield:", w_d_ADVI_mf, "\t", "ADVI fullrank:", 
-      w_d_ADVI_fr, "\n")
+      "ADVI meanfield:", w_d_ADVI_mf, "\t",
+      "ADVI meanfield center:", w_d_ADVI_mfc, "\t",
+      "ADVI fullrank:", w_d_ADVI_fr, "\n")
   
 }
 proc.time() - t_0
@@ -116,9 +123,10 @@ load("../results/wasserstein_phI_adapt_set22.RData")
 colMeans(w_d_matrix)
 
 
-w_d_summary <- w_d_matrix[, c(3, 1, 2, 4, 5, 6)] 
+w_d_summary <- w_d_matrix[, c(3, 1, 2, 4, 5, 6, 7)] 
 
-colnames(w_d_summary) <- c("random init", "pf", "max", "PhI", "meanfield", "fullrank")
+colnames(w_d_summary) <- c("random init", "pf", "max", "PhI", "meanfield",
+                           "meanfield center", "fullrank")
 rownames(w_d_summary) <- pn[model_record]
 
 # check pathfinder vs phase I warmup
@@ -229,16 +237,17 @@ dev.off()
 
 ## compare pathfinder with ADVI ##
 # ADVI meanfield 
-mean_ratio_orders2 = order(apply(w_d_summary[, c(2, 5, 6)] / w_d_summary[, 5], 
+mean_ratio_orders2 = order(apply(w_d_summary[, c(2, 5, 6, 7)] / w_d_summary[, 6], 
                                  1, max))
-mean_ratio_orders2 = order(rowMeans(w_d_summary[, c(2, 5, 6)] / w_d_summary[, 5]))
+mean_ratio_orders2 = order(rowMeans(w_d_summary[, c(2, 5, 6, 7)] / w_d_summary[, 6]))
 group2 = as.integer(order(mean_ratio_orders2) / 13)
-w_d_dat2 = data.frame(ratios = c(w_d_summary[, c(2, 5, 6)] / w_d_summary[, 5]),
+w_d_dat2 = data.frame(ratios = c(w_d_summary[, c(2, 5, 6, 7)] / w_d_summary[, 6]),
                      label = c(rep("pathfinder", length(model_record)), 
                                rep("meanfield ADVI", length(model_record)),
+                               rep("meanfield center", length(model_record)),
                                rep("fullrank ADVI", length(model_record))), 
-                     model = rep(pn[model_record], 3),
-                     group = rep(group2, 3))
+                     model = rep(pn[model_record], 4),
+                     group = rep(group2, 4))
 
 w_d_dat2$label <- as.factor(w_d_dat2$label)
 w_d_dat2$group <- as.factor(w_d_dat2$group)
