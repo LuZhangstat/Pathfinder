@@ -32,17 +32,23 @@ seed_list = 1:MC
 
 ## sensitivity test ##
 # shorter optimization path #
-N1 = 200    # maximum iters in optimization
-factr_tol = 1e7 # relative tolerance = 1-4 is not enough, should use at least 1e7
+sen_test_L <- FALSE
+if(sen_test_L){
+  N1 = 200    # maximum iters in optimization
+  factr_tol = 1e7 # relative tolerance = 1-4 is not enough, should use at least 1e7
+}
 
 # N_sam_DIV #
-N1 = 1000    # maximum iters in optimization
-factr_tol = 1e2 # relative tolerance = 1-4 is not enough, should use at least 1e7
-N_sam_DIV = 30  # samples for ELBO evaluation
+sen_test_K <- FALSE
+if(FALSE){
+  N_sam_DIV = 30  # samples for ELBO evaluation
+}
 
 # larger history #
-N_sam_DIV = 5
-lmm = 60
+sen_test_J <- FALSE
+if(sen_test_J){
+  lmm = 60
+}
 
 # load precalculated results #
 load(file = "../results/lp_posteriordb_LBFGS_h10.RData")
@@ -66,6 +72,8 @@ for(i in 1:49){ #length(model_record)
   sc <- stan_code(po)
   model <- stan_model(model_code = sc)
   
+  # file <- paste0("./posterior_database/models/stan/accel_gp_3.stan")
+  # model <- stan_model(file)
   ###  get the data  ###
   data <- get_data(po)
   

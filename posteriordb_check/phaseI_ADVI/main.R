@@ -19,16 +19,13 @@ L_pn = length(pn)
 
 # parameters settings #
 alpha = 0.01
-M = 3
+M = 5
 width = 600; height = 500 # the size of the plot
 mc.cores = parallel::detectCores() - 2
 sample_seed = 1234
-seed_list = 1:3
+seed_list = 1:5
 
-# pick models #
-model_record <- c(1, 2, 3, 4, 6, 8, 11, 13, 15, 20, 23, 25, 26, 27, 29, 31, 33,
-                  34, 36, 37, 40, 41, 43, 47, 51, 55, 61, 94, 95)
-N_models <- length(model_record)
+load(file = "../results/lp_posteriordb_LBFGS.RData")
 
 # preallocate results #
 lp_INV <- array(data = NA, dim = c(2, length(model_record)))
@@ -49,11 +46,15 @@ for(i in 1:length(model_record)){
   sc <- stan_code(po)
   model <- stan_model(model_code = sc)
   # obtain posterior interval of lp__
-  INV <- lp_Int_q_posteriordb(po, alpha)
-  lp_INV[, i] = INV[c(1, 2)]
-  lp_mean[i] = INV[3] 
+  if(modelname == "eight_schools-eight_schools_noncentered"){
+    INV <- lp_Int_q_posteriordb_8school_noncen(po, alpha)
+  } else if (modelname == "gp_pois_regr-gp_pois_regr") {
+    INV <- lp_Int_q_posteriordb_gp_pois_regr(po, alpha)
+  } else {INV <- lp_Int_q_posteriordb(po, alpha)}
+  lp_INV[, i] = INV[1:2]
+  lp_mean[i] = INV[3]
   
-  dat = get_data(po)
+  data = get_data(po)
   ## ADVI test ##
   
   cat("benchmark lp INV:", round(lp_INV[, i], digits = 3), 
@@ -64,13 +65,15 @@ for(i in 1:length(model_record)){
     tryCatch(
       log <- capture.output(
         suppressWarnings(
-          phiI_ADVI <- vb(model, data = dat, 
+          phiI_ADVI <- vb(model, data = data, 
                           seed = seed_list[j],
-                          algorithm ="meanfield"))), # meanfield fullrank, 
+                          algorithm ="meanfield",
+                          iter = 40000, 
+                          tol_rel_obj = 0.002))), # meanfield fullrank, 
       error = function(e) { ADVI_work <<- FALSE})
     tryCatch(
       log <- capture.output(
-        ADVI_lps <- lp_recover(model, data = dat, 
+        ADVI_lps <- lp_recover(model, data = data, 
                                pos_draws = phiI_ADVI@sim$samples)), # meanfield fullrank, 
       error = function(e) { ADVI_work <<- FALSE})
     
@@ -79,11 +82,36 @@ for(i in 1:length(model_record)){
       lp_ADVI_INV[, i] = quantile(ADVI_lps, c(alpha/2, 1-alpha/2))
       lp_ADVI_mean[i] <- mean(ADVI_lps)
       cat("ADVI lp INV:", round(lp_ADVI_INV[, i], digits = 3), 
-          "ADVI lp_ mean:", round(lp_ADVI_mean[i], digits = 3), "\n")}
+          "ADVI lp_ mean:", round(lp_ADVI_mean[i], digits = 3), "\t",
+          "pareto k:", phiI_ADVI@sim$diagnostics$psis$pareto_k  , "\n")}
   }
   
 }
 
+
+
+phiI_ADVI <- vb(model, data = data, 
+                #seed = 2,
+                algorithm ="meanfield", iter = 2000, 
+                tol_rel_obj = 0.01, 
+                grad_samples = 1,
+                importance_resampling = TRUE)
+
+
+phiI_ADVI <- vb(model, data = data, 
+                algorithm ="fullrank", iter = 20000, 
+                tol_rel_obj = 0.001, 
+                grad_samples = 1,
+                importance_resampling = TRUE)
+
+phiI_ADVI@sim$diagnostics$psis$pareto_k
+ADVI_lps <- lp_recover(model, data = data, 
+                       pos_draws = phiI_ADVI@sim$samples)
+quantile(ADVI_lps, c(alpha/2, 0.5, 1-alpha/2))
+mean(ADVI_lps)
+INV
+
+round(quantile(lp_f_draws, c(alpha/2, 1-alpha/2)), digits = 2)
 
 ## Check fullrank ##
 # preallocate results #
@@ -92,7 +120,8 @@ lp_mean <- c()
 lp_ADVI_INV <- array(data = NA, dim = c(2, length(model_record)))
 lp_ADVI_mean <- c()
 
-for(i in 1:length(model_record)){
+which(model_record ==24)
+for(i in 9:length(model_record)){
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   # pick model
@@ -104,11 +133,15 @@ for(i in 1:length(model_record)){
   sc <- stan_code(po)
   model <- stan_model(model_code = sc)
   # obtain posterior interval of lp__
-  INV <- lp_Int_q_posteriordb(po, alpha)
-  lp_INV[, i] = INV[c(1, 2)]
-  lp_mean[i] = INV[3] 
+  if(modelname == "eight_schools-eight_schools_noncentered"){
+    INV <- lp_Int_q_posteriordb_8school_noncen(po, alpha)
+  } else if (modelname == "gp_pois_regr-gp_pois_regr") {
+    INV <- lp_Int_q_posteriordb_gp_pois_regr(po, alpha)
+  } else {INV <- lp_Int_q_posteriordb(po, alpha)}
+  lp_INV[, i] = INV[1:2]
+  lp_mean[i] = INV[3]
   
-  dat = get_data(po)
+  data = get_data(po)
   ## ADVI test ##
   
   cat("benchmark lp INV:", round(lp_INV[, i], digits = 3), 
@@ -119,13 +152,16 @@ for(i in 1:length(model_record)){
     tryCatch(
       log <- capture.output(
         suppressWarnings(
-          phiI_ADVI <- vb(model, data = dat, 
+          phiI_ADVI <- vb(model, data = data, 
                           seed = seed_list[j],
-                          algorithm ="fullrank"))), # meanfield fullrank, 
+                          algorithm ="fullrank",
+                          iter = 40000, 
+                          tol_rel_obj = 0.002,
+                          importance_resampling = TRUE))), # meanfield fullrank, 
       error = function(e) { ADVI_work <<- FALSE})
     tryCatch(
       log <- capture.output(
-        ADVI_lps <- lp_recover(model, data = dat, 
+        ADVI_lps <- lp_recover(model, data = data, 
                                pos_draws = phiI_ADVI@sim$samples)), # meanfield fullrank, 
       error = function(e) { ADVI_work <<- FALSE})
     
@@ -134,7 +170,27 @@ for(i in 1:length(model_record)){
       lp_ADVI_INV[, i] = quantile(ADVI_lps, c(alpha/2, 1-alpha/2))
       lp_ADVI_mean[i] <- mean(ADVI_lps)
       cat("ADVI lp INV:", round(lp_ADVI_INV[, i], digits = 3), 
-          "ADVI lp_ mean:", round(lp_ADVI_mean[i], digits = 3), "\n")}
+          "ADVI lp_ mean:", round(lp_ADVI_mean[i], digits = 3), "\t",
+          "pareto k:", phiI_ADVI@sim$diagnostics$psis$pareto_k  , "\n")}
   }
   
 }
+
+# test code #
+phiI_ADVI <- vb(model, data = data, tol_rel_obj = 0.01,
+                seed = 123, 
+                algorithm ="fullrank")
+print(phiI_ADVI, c("mu", "tau", "phi", "E_deaths"))
+ADVI_lps <- lp_recover(model, data = data, 
+                     pos_draws = phiI_ADVI@sim$samples)
+Hk = cov(phiI_ADVI@sim$samples[[1]])
+
+quantile(ADVI_lps, c(alpha/2, 1-alpha/2))
+mean(ADVI_lps)
+
+
+ADVI_fs <- f_recover(model, data = data, 
+                       pos_draws = phiI_ADVI@sim$samples)
+
+quantile(ADVI_fs, c(alpha/2, 1-alpha/2))
+mean(ADVI_fs)
