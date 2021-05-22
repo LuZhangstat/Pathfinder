@@ -9,11 +9,11 @@ source("../utils/lp_utils.R")
 source("../utils/sim_pf.R")
 
 
-load("../results/lp_posteriordb_phI_adapt_large_K.RData") # Pathfinder #_resam_all #_resam_each
+load("../results/lp_posteriordb_phI_adapt_default.RData") # Pathfinder #_resam_all #_resam_each
 load("../results/lp_posteriordb_LBFGS_h10.RData")
 load("../results/PhI_100_h10.RData")
 load("../results/ADVI_100.RData")
-load("../results/pf_SIR_WOR_4_draws_large_K.RData")
+load("../results/pf_SIR_WOR_4_draws_default.RData")
 
 
 pd <- pdb_local() # Posterior database connection
