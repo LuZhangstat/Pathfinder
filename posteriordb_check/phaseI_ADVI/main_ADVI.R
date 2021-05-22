@@ -19,21 +19,25 @@ pn <- posterior_names(pd)
 L_pn = length(pn)
 
 # ADVI settings #
-ADVI_iter = 40000 
-tol_rel_obj = 0.001
+#ADVI_iter = 40000 
+#tol_rel_obj = 0.001
 width = 600; height = 500 # the size of the plot
 mc.cores = parallel::detectCores() - 2
 sample_seed = 1234
 M = 20
 seed_list = 1:M
 
-load(file = "../results/lp_posteriordb_LBFGS.RData")
+load(file = "../results/lp_posteriordb_LBFGS_h10.RData")
 
 # preallocate results #
 ADVI_meanfield_draw <- list() 
 ADVI_meanfield_center <- list() 
-ADVI_fullrank_draw <- list() 
+iter_fit_mean <- c()
+calls_lp_mean <- c()
+calls_gr_mean <- c()
 
+
+eta_sequence <- c(100, 10, 1, 0.1, 0.01)
 ## check meanfield ##
 for(i in 1:length(model_record)){
   modelname <- pn[model_record[i]]
@@ -69,8 +73,9 @@ for(i in 1:length(model_record)){
                                 init = list(init[[j]]),
                                 sig_figs = 16,
                                 algorithm = "meanfield",
-                                iter = ADVI_iter,
-                                tol_rel_obj = tol_rel_obj)
+                                save_latent_dynamics = TRUE)#,
+                                #iter = ADVI_iter,
+                                #tol_rel_obj = tol_rel_obj)
     tryCatch(
       fit_ADVI$lp(),
       error = function(e) { ADVI_work <<- FALSE})
@@ -79,12 +84,23 @@ for(i in 1:length(model_record)){
       unconstrained_draws <- unconstrain_cmdstan_vb(model, data, fit_ADVI)
       ADVI_meanfield_draw[[i]] <- unconstrained_draws # record the last sample of phase I
       ADVI_meanfield_center[[i]] <-  colMeans(unconstrained_draws)
+      latent_dyn <- read.csv(fit_ADVI$latent_dynamics_files())
+      iter_fit <- as.numeric(latent_dyn$X..stan_version_major...2[
+        length(latent_dyn$X..stan_version_major...2)-2])
+      iter_fit_mean <- c(iter_fit_mean, iter_fit)
+      eta_i = which(eta_sequence == fit_ADVI$metadata()$eta)
+      calls_lp_mean <- c(calls_lp_mean, iter_fit + 100 * min(eta_i+2, 6))
+      calls_gr_mean <- c(calls_gr_mean, iter_fit + 50 * min(eta_i+1, 5))
       break
     }
   }
 }
 
 ## check fullrank ##
+ADVI_fullrank_draw <- list() 
+iter_fit_full <- c()
+calls_lp_full <- c()
+calls_gr_full <- c()
 for(i in 1:length(model_record)){
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
@@ -119,8 +135,9 @@ for(i in 1:length(model_record)){
                                 init = list(init[[j]]),
                                 sig_figs = 16,
                                 algorithm = "fullrank",
-                                iter = ADVI_iter,
-                                tol_rel_obj = tol_rel_obj)
+                                save_latent_dynamics = TRUE)#,
+                                #iter = ADVI_iter,
+                                #tol_rel_obj = tol_rel_obj)
     tryCatch(
       fit_ADVI$lp(),
       error = function(e) { ADVI_work <<- FALSE})
@@ -128,12 +145,45 @@ for(i in 1:length(model_record)){
       print(summary(fit_ADVI$lp()))
       unconstrained_draws <- unconstrain_cmdstan_vb(model, data, fit_ADVI)
       ADVI_fullrank_draw[[i]] <- unconstrained_draws # record the last sample of phase I
+      latent_dyn <- read.csv(fit_ADVI$latent_dynamics_files())
+      iter_fit_full <- c(iter_fit_full, 
+                         as.numeric(latent_dyn$X..stan_version_major...2[
+                           length(latent_dyn$X..stan_version_major...2)-2]))
+      
+      latent_dyn <- read.csv(fit_ADVI$latent_dynamics_files())
+      iter_fit <- as.numeric(latent_dyn$X..stan_version_major...2[
+        length(latent_dyn$X..stan_version_major...2)-2])
+      iter_fit_full <- c(iter_fit_full, iter_fit)
+      eta_i = which(eta_sequence == fit_ADVI$metadata()$eta)
+      calls_lp_full <- c(calls_lp_full, iter_fit + 100 * min(eta_i+2, 6))
+      calls_gr_full <- c(calls_gr_full, iter_fit + 50 * min(eta_i+1, 5))
       break
     }
   }
 }
 
 
-save(file = "../results/ADVI_results.RData",
+save(file = "../results/ADVI_results_h10.RData",
      list = c("ADVI_meanfield_draw", "ADVI_meanfield_center",
-              "ADVI_fullrank_draw"))
+              "ADVI_fullrank_draw", "calls_lp_mean", "calls_gr_mean",
+              "calls_lp_full", "calls_gr_full"))
+
+
+
+### 
+
+fit_ADVI$cmdstan_diagnose()
+
+fit_ADVI <- mod$variational(data = data,
+                            seed = seed_list[j],
+                            #refresh = 1,
+                            init = list(init[[j]]),
+                            sig_figs = 16,
+                            algorithm = "meanfield",
+                            save_latent_dynamics = TRUE,
+                            #iter = ADVI_iter,
+                            #tol_rel_obj = tol_rel_obj
+                            )
+
+
+
