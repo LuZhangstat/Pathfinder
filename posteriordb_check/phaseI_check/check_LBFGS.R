@@ -87,7 +87,7 @@ for(i in 1:length(model_record)){
   gr <- function(theta) -grad_log_prob(posterior, theta, adjust_transform = TRUE)
   
   # choose the size of history in L-BFGS
-  lmm = min(max(D, 5), 200)
+  lmm = 6;
   cat("No. pars:", D," lmm in L-BFGS: ", lmm, "\n")
   
   set.seed(1234)
@@ -196,17 +196,17 @@ for(i in 1:length(model_record)){
 }
 
 
-# save(file = "../results/lp_posteriordb_LBFGS.RData",
-#      list = c("lp_LBFGS_n_fn", "lp_LBFGS_n_gr", "initial_ls", "lp_INV",
-#               "lp_mean", "model_record"))
-load(file = "../results/lp_posteriordb_LBFGS.RData")
+save(file = "../results/lp_posteriordb_LBFGS_h6.RData",
+     list = c("lp_LBFGS_n_fn", "lp_LBFGS_n_gr", "initial_ls", "lp_INV",
+              "lp_mean", "model_record"))
+load(file = "../results/lp_posteriordb_LBFGS_h10.RData")
 
 ## check the distribution of number of iterations ##
 n_grfn <- colMeans(abs(lp_LBFGS_n_gr))
-mean(n_grfn) # 35.25
-median(n_grfn) # 30.55
-sd(n_grfn)   # 23.75
-sd(abs(lp_LBFGS_n_gr)) # 25.38
+mean(n_grfn) # 35.25  # 38.8898
+median(n_grfn) # 30.55 # 30.55
+sd(n_grfn)   # 23.75 #42.33
+sd(abs(lp_LBFGS_n_gr)) # 25.38 #44.07
 jpeg(filename = paste0("../pics/hist_LBFGS_grfn_counts.jpeg"),
      width = width, height = height, units = "px", pointsize = 12)
 hist(abs(lp_LBFGS_n_gr), breaks = 100, 
