@@ -27,16 +27,17 @@ width = 600; height = 500 # the size of the plot
 mc.cores = parallel::detectCores() - 2
 sample_seed = 1234
 
-load(file = "../results/lp_posteriordb_LBFGS.RData")
+load(file = "../results/lp_posteriordb_LBFGS_h10.RData")
 
 # preallocate results #
 lp_explore_n_iters <- array(data = NA, dim = c(M, length(model_record)))
 lp_explore_n_leapfrog <- array(data = NA, dim = c(M, length(model_record)))
 lp_data <- c()
 PhaseI_last_draw <- list() # Get the last samples of Phase I
+PhI_leapfrog_counts <- array(data = NA, dim = c(M, length(model_record)))
 
 i = which(model_record == 27)
-for(i in 1:49){ #20 length(model_record)
+for(i in 41:49){ #20 length(model_record)
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   # pick model
@@ -74,7 +75,7 @@ for(i in 1:49){ #20 length(model_record)
       show_messages = FALSE,
       sig_figs = 16
     ))
-  p1 <- mcmc_trace(fit$draws("lp__", inc_warmup = TRUE)[60:80, ,]) #c("lp__", "phi[1]", "lambda[1]", "theta1[1]")
+  p1 <- mcmc_trace(fit$draws("lp__", inc_warmup = TRUE)[60:80, ,], iter1 = 60) #c("lp__", "phi[1]", "lambda[1]", "theta1[1]")
   print(p1)
   
   ## record the initial and the last sample of phase I ##
@@ -95,6 +96,9 @@ for(i in 1:49){ #20 length(model_record)
   printf("the average leapfrogs is %.2f, sd is %.2f", 
          mean(lp_explore_sum$n_sum_leapfrog), sd(lp_explore_sum$n_sum_leapfrog))
   
+  # Get the cost of Phase I warmup
+  PhI_leapfrog_counts[, i] <- colSums(
+    fit$sampler_diagnostics(inc_warmup = TRUE)[1:75, , "n_leapfrog__"])
   
   # check the trace plot of lp__ #
   pos_d <- list()
@@ -174,11 +178,11 @@ for(i in 1:49){ #20 length(model_record)
   dev.off()
 }
 
-save(file = "../results/lp_posteriordb_explore.RData",
+save(file = "../results/lp_posteriordb_explore_h10.RData",
      list = c("lp_explore_n_iters", "lp_explore_n_leapfrog", "lp_data", 
-              "PhaseI_last_draw"))
+              "PhaseI_last_draw", "PhI_leapfrog_counts"))
 
-# load("../results/lp_posteriordb_explore.RData")
+# load("../results/lp_posteriordb_explore_h10.RData")
 
 ## check the distribution of number of iterations ##
 n_iters_mean <- colMeans(lp_explore_n_iters)
