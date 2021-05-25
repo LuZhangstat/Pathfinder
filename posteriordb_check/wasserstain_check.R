@@ -10,10 +10,11 @@ source("../utils/sim_pf.R")
 
 
 load("../results/lp_posteriordb_phI_adapt_default.RData") # Pathfinder #_resam_all #_resam_each
-load("../results/lp_posteriordb_LBFGS_h10.RData")
+load("../results/lp_posteriordb_LBFGS_h6.RData")
 load("../results/PhI_100_h10.RData")
 load("../results/ADVI_100.RData")
-load("../results/pf_SIR_WOR_4_draws_default.RData")
+load("../results/multi_pf_samples_default.RData")
+#load("../results/pf_SIR_WOR_4_draws_default.RData")
 
 
 pd <- pdb_local() # Posterior database connection
@@ -66,19 +67,27 @@ for(i in 1:49){ #length(model_record)
   ### calculate wasserstein distance ###
   # pathfinder #
   if(ncol(pick_samples) == 1){
-    a = wpp(rbind(t(pick_samples), t(pick_samples)), 
+    a = wpp(rbind(t(pick_samples), t(pick_samples)),
             mass = rep(1 / 2, 2))
   }else{
-    a = wpp(t(pick_samples), 
+    a = wpp(t(pick_samples),
             mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
   }
   b = wpp(ref_samples, mass = rep(1 / nrow(ref_samples), nrow(ref_samples)))
   w_d_pf <- wasserstein(a, b, p = 2); w_d_pf
   
-  # multi-path pathfinder with PS-IR #
-  pick_samples_IR <- do.call(cbind, pf_SIR_WOR_4_draws[[i]]) 
-  a_IR = wpp(t(pick_samples_IR), 
-          mass = rep(1 / ncol(pick_samples_IR), ncol(pick_samples_IR)))
+  # # multi-path pathfinder with PS-IR #
+  # pick_samples_IR <- do.call(cbind, pf_SIR_WOR_4_draws[[i]])
+  # a_IR = wpp(t(pick_samples_IR),
+  #         mass = rep(1 / ncol(pick_samples_IR), ncol(pick_samples_IR)))
+  # w_d_pf_IR <- wasserstein(a_IR, b, p = 2); w_d_pf_IR
+  
+  # multi-path pathfinder #
+  set.seed(123)
+  pick_samples_IR <- sapply(lp_multi_opath[[i]], f <- function(x){
+    x[, 1]}) #sample.int(ncol(x), 1)
+  a_IR = wpp(t(pick_samples_IR),
+             mass = rep(1 / ncol(pick_samples_IR), ncol(pick_samples_IR)))
   w_d_pf_IR <- wasserstein(a_IR, b, p = 2); w_d_pf_IR
 
   # optims #
@@ -130,21 +139,22 @@ for(i in 1:49){ #length(model_record)
 }
 proc.time() - t_0
 
-colnames(w_d_matrix) <- c("pf", "pf_4_IR", "max", "random init", "PhI", 
+colnames(w_d_matrix) <- c("pf", "pf_20_IR", "max", "random init", "PhI", 
                           "meanfield", "meanfield center", 
                           "fullrank")
 rownames(w_d_matrix) <- pn[model_record]
 
-save(file = "../results/wasserstein_phI_adapt_large_K.RData",
+save(file = "../results/wasserstein_phI_adapt_default.RData",
      list = c("w_d_matrix"))
 
-load("../results/wasserstein_phI_adapt_large_K.RData") #default; long_hist, short_L, large_K
+## check the output ##
+load("../results/wasserstein_phI_adapt_default.RData") #default; long_hist, short_L, large_K
 colMeans(w_d_matrix)
 # check pathfinder vs phase I warmup
 pf_vs_phI <- (w_d_matrix[, "pf"] / w_d_matrix[, "PhI"])
 summary(pf_vs_phI)
 quantile(pf_vs_phI, c(0.05, 0.5, 0.95))
-pf_IR_vs_phI <- (w_d_matrix[, "pf_4_IR"] / w_d_matrix[, "PhI"])
+pf_IR_vs_phI <- (w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "PhI"])
 summary(pf_IR_vs_phI)
 quantile(pf_IR_vs_phI, c(0.05, 0.5, 0.95))
 
@@ -155,14 +165,14 @@ summary(w_d_matrix[, "pf"] / w_d_matrix[, "fullrank"])
 summary(w_d_matrix[, "pf"] / w_d_matrix[, "meanfield center"])
 
 ## one plot ##
-ratios <- c(w_d_matrix[, c("pf", "pf_4_IR", "PhI", "meanfield",
+ratios <- c(w_d_matrix[, c("pf", "pf_20_IR", "PhI", "meanfield",
                            "meanfield center", "fullrank")] / #c(2, 3, 4, 5, 6, 7)] /
-              w_d_matrix[, "pf_4_IR"])
+              w_d_matrix[, "pf_20_IR"])
 ratios[ratios > 2^10] <- 2^10
 w_d_dat = data.frame(ratios = ratios,
                      label = c(
                        rep("pathfinder", length(model_record)),
-                       rep("pathfinder with IR", length(model_record)),
+                       rep("multi-path pathfinder", length(model_record)),
                        rep("Stan Phase I", length(model_record)),
                        rep("meanfield ADVI", length(model_record)),
                        rep("meanfield center", length(model_record)),
@@ -191,7 +201,7 @@ height <- 8.0
 pointsize <- 16
 
 setEPS()
-postscript("../pics/phI_adapt_large_K/W_d_compar_100_each.eps",  #_resam_each
+postscript("../pics/phI_adapt_default/W_d_compar_100_each.eps",  #_resam_each
            width = width, height = height)
 print(p_w_d_compar)
 dev.off()
@@ -199,11 +209,12 @@ dev.off()
 ## compute the 100 wasserstein distance for each ADVI and pf ##
 M = 100
 W_d_100_pf <- array(data = NA, dim = c(M, length(model_record)))
+W_d_100_pf_IR <- array(data = NA, dim = c(M, length(model_record)))
 W_d_100_ADVI_mf <- array(data = NA, dim = c(M, length(model_record)))
 W_d_100_ADVI_fr <- array(data = NA, dim = c(M, length(model_record)))
 
 t_0 <- proc.time()
-for(i in 1:49){ #length(model_record)
+for(i in 10:49){ #length(model_record)
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   
@@ -260,51 +271,66 @@ for(i in 1:49){ #length(model_record)
     
     W_d_100_pf[j, i] = w_d_pf
     
-    # # ADVI: meanfield #
-    # if( (i == 8 && j == 54) | 
-    #     (i == 8 && j == 63) |
-    #     (i == 8 && j == 65) | 
-    #     (i == 8 && j == 94) |
-    #     (i == 13 && j == 12) |
-    #     (i == 38 && j == 15) | 
-    #     (i == 38 && j == 68) |
-    #     (i == 39 && j == 10) |
-    #     (i == 40 && j == 62) ){
-    #   w_d_ADVI_mf = Inf
-    #   W_d_100_ADVI_mf[j, i] = Inf
-    # }else{
-    #   a_ADVI_mf = wpp(ADVI_meanfield_draw_100[[i]][[j]],
-    #                   mass = rep(1 / nrow(ADVI_meanfield_draw_100[[i]][[j]]),
-    #                              nrow(ADVI_meanfield_draw_100[[i]][[j]])))
-    #   w_d_ADVI_mf <- wasserstein(a_ADVI_mf, b, p = 2); w_d_ADVI_mf
-    #   
-    #   W_d_100_ADVI_mf[j, i] <- w_d_ADVI_mf
-    # }
-    # 
-    # 
-    # # ADVI: fullrank #
-    # a_ADVI_fr = wpp(ADVI_fullrank_draw_100[[i]][[j]],
-    #                 mass = rep(1 / nrow(ADVI_fullrank_draw_100[[i]][[j]]),
-    #                            nrow(ADVI_fullrank_draw_100[[i]][[j]])))
-    # w_d_ADVI_fr <- wasserstein(a_ADVI_fr, b, p = 2); w_d_ADVI_fr
-    # 
-    # W_d_100_ADVI_fr[j, i] <- w_d_ADVI_fr
+    ### samples from multi_path pathfinder ###
+    pick_samples_M <- lp_multi_opath[[i]][[j]]
+    a_M = wpp(t(pick_samples_M), 
+            mass = rep(1 / ncol(pick_samples_M), ncol(pick_samples_M)))
     
-    cat("pf:", w_d_pf, "\t", 
+    w_d_pf_M <- wasserstein(a_M, b, p = 2); w_d_pf_M
+    W_d_100_pf_IR[j, i] = w_d_pf_M
+    
+    # ADVI: meanfield #
+    if( (i == 8 && j == 55) |
+        (i == 8 && j == 64) |
+        (i == 8 && j == 66) |
+        (i == 8 && j == 94) |
+        (i == 10 && j == 16) |
+        (i == 13 && j == 12) |
+        (i == 38 && j == 15) |
+        (i == 38 && j == 68) |
+        (i == 39 && j == 10) |
+        (i == 40 && j == 62)){
+      w_d_ADVI_mf = Inf
+      W_d_100_ADVI_mf[j, i] = Inf
+    }else{
+      a_ADVI_mf = wpp(ADVI_meanfield_draw_100[[i]][[j]],
+                      mass = rep(1 / nrow(ADVI_meanfield_draw_100[[i]][[j]]),
+                                 nrow(ADVI_meanfield_draw_100[[i]][[j]])))
+      w_d_ADVI_mf <- wasserstein(a_ADVI_mf, b, p = 2); w_d_ADVI_mf
+
+      W_d_100_ADVI_mf[j, i] <- w_d_ADVI_mf
+    }
+
+
+    # ADVI: fullrank #
+    a_ADVI_fr = wpp(ADVI_fullrank_draw_100[[i]][[j]],
+                    mass = rep(1 / nrow(ADVI_fullrank_draw_100[[i]][[j]]),
+                               nrow(ADVI_fullrank_draw_100[[i]][[j]])))
+    w_d_ADVI_fr <- wasserstein(a_ADVI_fr, b, p = 2); w_d_ADVI_fr
+
+    W_d_100_ADVI_fr[j, i] <- w_d_ADVI_fr
+    
+    cat("pf:", w_d_pf, "\t", "multi pf:", w_d_pf_M, "\t",
         "ADVI meanfield:", W_d_100_ADVI_mf[j, i], "\t",
         "ADVI fullrank:", W_d_100_ADVI_fr[j, i], "\n")
   }
 }
+proc.time() - t_0
 
-save(file = "../results/wasserstein_100_large_K.RData",
-     list = c("W_d_100_pf", "W_d_100_ADVI_mf", 
+save(file = "../results/wasserstein_100_default.RData",
+     list = c("W_d_100_pf", "W_d_100_pf_IR", "W_d_100_ADVI_mf", 
               "W_d_100_ADVI_fr"))
 
-#load("../results/wasserstein_100_28.RData")
+
+
+#large_K
+load("../results/wasserstein_100_default.RData")
 W_d_100_pf[100, ]
 
-## check ##
+## check the output ##
 pf_w_d_qtils <- apply(W_d_100_pf, 2, 
+                      f <- function(x){quantile(x, c(0.25, 0.5, 0.75))})
+pf_M_w_d_qtils <- apply(W_d_100_pf_IR, 2, 
                       f <- function(x){quantile(x, c(0.25, 0.5, 0.75))})
 ADVI_mf_w_d_qtils <- apply(W_d_100_ADVI_mf, 2, 
                            f <- function(x){quantile(x, c(0.25, 0.5, 0.75))})
@@ -314,8 +340,133 @@ ADVI_fr_w_d_qtils <- apply(W_d_100_ADVI_fr, 2,
 for(i in 1:49){
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
-  print(cbind(pf_w_d_qtils[, i], ADVI_mf_w_d_qtils[, i], ADVI_fr_w_d_qtils[, i]))
+  print(cbind(pf_w_d_qtils[, i], pf_M_w_d_qtils[, i], ADVI_mf_w_d_qtils[, i], 
+              ADVI_fr_w_d_qtils[, i]))
 }
+
+## compute wasserstein distance for sensitivity test ##
+load("../results/lp_posteriordb_phI_adapt_short_L.RData")
+lp_opath_short_L <- lp_opath
+load("../results/lp_posteriordb_phI_adapt_large_K.RData")
+lp_opath_large_K <- lp_opath
+load("../results/lp_posteriordb_phI_adapt_long_hist.RData")
+lp_opath_long_hist <- lp_opath
+M = 100
+W_d_100_pf_short_L <- array(data = NA, dim = c(M, length(model_record)))
+W_d_100_pf_large_K <- array(data = NA, dim = c(M, length(model_record)))
+W_d_100_pf_long_hist <- array(data = NA, dim = c(M, length(model_record)))
+
+t_0 <- proc.time()
+for(i in 1:49){ #length(model_record)
+  modelname <- pn[model_record[i]]
+  printf("model %d: %s", model_record[i], modelname)
+  
+  # pick model
+  po <- posterior(modelname, pdb = pd)
+  # get reference posterior samples
+  gsd <- reference_posterior_draws(po)
+  
+  # compile the model
+  sc <- stan_code(po)
+  model <- stan_model(model_code = sc)
+  
+  ###  get the data  ###
+  data <- get_data(po)
+  
+  ### get reference samples ###
+  posterior <- to_posterior(model, data)
+  D <- get_num_upars(posterior)
+  if(modelname == "eight_schools-eight_schools_noncentered"){
+    constrained_draws <- modify_8school_noncen(po)
+    unconstrained_draws <-  lapply(constrained_draws, unconstrain_draws, posterior)
+  } else if (modelname == "gp_pois_regr-gp_pois_regr") {
+    constrained_draws <- modify_draws_gp_pois_regr(po)
+    unconstrained_draws <-  lapply(constrained_draws, unconstrain_draws, posterior)
+  } else {
+    unconstrained_draws <-  lapply(gsd, unconstrain_draws, posterior)
+  }
+  
+  ref_samples = rbind(unconstrained_draws[[1]], unconstrained_draws[[2]], 
+                      unconstrained_draws[[3]], unconstrained_draws[[4]],
+                      unconstrained_draws[[5]], unconstrained_draws[[6]],
+                      unconstrained_draws[[7]], unconstrained_draws[[8]],
+                      unconstrained_draws[[9]], unconstrained_draws[[10]])
+  
+  b = wpp(ref_samples, mass = rep(1 / nrow(ref_samples), nrow(ref_samples)))
+  
+  for(j in 1:M){
+    cat(j, "\t")
+    ### samples from pathfinder ###
+    # _short_L
+    if(lp_opath_short_L[[i]]$opath[[j]]$status == "mode"){ # no approximating Normal
+      pick_samples <- matrix(lp_opath_short_L[[i]]$opath[[j]]$y[
+        nrow(lp_opath_short_L[[i]]$opath[[j]]$y), 
+        -ncol(lp_opath_short_L[[i]]$opath[[j]]$y)], ncol = 1)
+    } else {
+      pick_samples <- extract_samples(lp_opath_short_L[[i]]$opath[[j]])
+    }
+    if(ncol(pick_samples) == 1){
+      a = wpp(rbind(t(pick_samples), t(pick_samples)), 
+              mass = rep(1 / 2, 2))
+    }else{
+      a = wpp(t(pick_samples), 
+              mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
+    }
+    w_d_pf1 <- wasserstein(a, b, p = 2); w_d_pf1
+    
+    W_d_100_pf_short_L[j, i] = w_d_pf1
+    
+    # _large_K
+    if(lp_opath_large_K[[i]]$opath[[j]]$status == "mode"){ # no approximating Normal
+      pick_samples <- matrix(lp_opath_large_K[[i]]$opath[[j]]$y[
+        nrow(lp_opath_large_K[[i]]$opath[[j]]$y), 
+        -ncol(lp_opath_large_K[[i]]$opath[[j]]$y)], ncol = 1)
+    } else {
+      pick_samples <- extract_samples(lp_opath_large_K[[i]]$opath[[j]])
+    }
+    if(ncol(pick_samples) == 1){
+      a = wpp(rbind(t(pick_samples), t(pick_samples)), 
+              mass = rep(1 / 2, 2))
+    }else{
+      a = wpp(t(pick_samples), 
+              mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
+    }
+    w_d_pf2 <- wasserstein(a, b, p = 2); w_d_pf2
+    
+    W_d_100_pf_large_K[j, i] = w_d_pf2
+    
+    #_long_hist
+    if(lp_opath_long_hist[[i]]$opath[[j]]$status == "mode"){ # no approximating Normal
+      pick_samples <- matrix(lp_opath_long_hist[[i]]$opath[[j]]$y[
+        nrow(lp_opath_long_hist[[i]]$opath[[j]]$y), 
+        -ncol(lp_opath_long_hist[[i]]$opath[[j]]$y)], ncol = 1)
+    } else {
+      pick_samples <- extract_samples(lp_opath_long_hist[[i]]$opath[[j]])
+    }
+    if(ncol(pick_samples) == 1){
+      a = wpp(rbind(t(pick_samples), t(pick_samples)), 
+              mass = rep(1 / 2, 2))
+    }else{
+      a = wpp(t(pick_samples), 
+              mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
+    }
+    w_d_pf3 <- wasserstein(a, b, p = 2); w_d_pf3
+    
+    W_d_100_pf_long_hist[j, i] = w_d_pf3
+    
+    cat("pf:", W_d_100_pf[j, i], "\t",
+        "pf_short_L:", w_d_pf1, "\t",
+        "pf_large_K:", w_d_pf2, "\t",
+        "pf_long_hist:", w_d_pf3, "\n")
+  }
+}
+proc.time() - t_0
+
+save(file = "../results/wasserstein_100_sen.RData",
+     list = c("W_d_100_pf_short_L", "W_d_100_pf_large_K", 
+              "W_d_100_pf_long_hist"))
+
+
 
 
 
