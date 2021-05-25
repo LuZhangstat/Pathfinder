@@ -12,33 +12,59 @@ cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2",
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 
-load("../results/lp_posteriordb_LBFGS_h10.RData")
-#load("../results/lp_posteriordb_explore_h10.RData")
+## HMC vs L-BFGS plot in Introduction ##
+load("../results/lp_posteriordb_LBFGS_h6.RData")
+load("../results/lp_posteriordb_explore_h6.RData")
+M = 20
+df <- data.frame(n_counts = c(c(abs(lp_LBFGS_n_gr)), c(lp_explore_n_leapfrog)),
+                 model = rep(rep(pn[model_record], each = M), 2),
+                 n_leapfrogs = rep(c(lp_explore_n_leapfrog), 2),
+                 not_reach_target = 
+                   c(rep(apply(lp_LBFGS_n_gr, 2, 
+                               f <- function(x){as.numeric(any(x < 0))}), 
+                         each = M), rep(2, M*length(model_record))))
+
+width <- 12.0
+height <- 8.0
+setEPS()
+postscript("../pics/box_compar_LBFGS_log.eps",  #_resam_each
+           width = width, height = height)
+p_box_compar <- df %>% mutate(type= c("L-BFGS", "L-BFGS(multimodal)", 
+                                      "Stan Phase I")
+                              [not_reach_target + 1]) %>%
+  ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
+             x = n_counts, color = type)) + 
+  geom_boxplot() + 
+  scale_colour_manual(values=cbbPalette) + 
+  scale_x_log10(breaks=c(10, 1e2, 1e3, 1e4, 1e5), 
+                labels = c("10", "100", "1000", "10,000", "100,000")) + 
+  ylab("") + xlab("") + #xlab("calls to log density and gradient") + 
+  theme_bw(base_size = 12 )+
+  theme(legend.position="top", legend.title = element_blank()) 
+print(p_box_compar)
+dev.off()
+
+## Plots in Section 3 ##
+load("../results/lp_posteriordb_LBFGS_h6.RData")
 load("../results/lp_posteriordb_phI_adapt_default.RData")
 
 ### Wasserstein distance check for 100 repeats ###
-## PSIS one sample from each ##
 M = 100
 load("../results/wasserstein_phI_adapt_default.RData")
-# load("../results/W_d_IR_4_30.RData")
-# w_d_summary <- cbind(w_d_matrix[, c(3, 1, 2, 4, 5, 6, 7)], w_d_IR)
-# colnames(w_d_summary) <- c("random init", "pf", "max", "PhI", "meanfield",
-#                            "meanfield center", "fullrank", "pf_4_IR")
-# rownames(w_d_summary) <- pn[model_record]
 
 # check pathfinder vs phase I warmup
 pf_vs_phI <- (w_d_matrix[, "pf"] / w_d_matrix[, "PhI"])
 summary(pf_vs_phI)
 quantile(pf_vs_phI, c(0.05, 0.5, 0.95))
 
-pf_vs_phI <- (w_d_matrix[, "pf_4_IR"] / w_d_matrix[, "PhI"])
+pf_vs_phI <- (w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "PhI"])
 summary(pf_vs_phI)
 quantile(pf_vs_phI, c(0.05, 0.5, 0.95))
 table(pf_vs_phI<1.2)
 max(pf_vs_phI)
 
 ## rank methods ##
-rank_score <- apply(w_d_matrix[, c("pf", "pf_4_IR", "PhI", "meanfield", 
+rank_score <- apply(w_d_matrix[, c("pf", "pf_20_IR", "PhI", "meanfield", 
                                    "meanfield center", "fullrank")], 1, 
                     f <- function(x){order(order(x))})
 table(rank_score[2, ]==1)
@@ -47,25 +73,47 @@ table(rank_score[2, ]<4)
 table(rank_score[1, ]==1)
 table(rank_score[3, ]<3)
 rowSums(rank_score)
+round(rowMeans(rank_score), 1)
+
+# faceted rank histograms
+rank_dat = data.frame(rank = c(rank_score),
+                     label = rep(c("pathfinder", 
+                                   "multi-path pathfinder", 
+                                   "Stan Phase I",
+                                   "mean-field ADVI",
+                                   "mean-field center",
+                                   "dense ADVI"), length(model_record)))
+
+p_rank <- ggplot(rank_dat, aes(x = rank)) + geom_histogram(bins = 6) + 
+  facet_wrap(~label)
+p_rank
+width <- 8.0
+height <- 4.0
+
+setEPS()
+postscript("../pics/phI_adapt_default/rank_test.eps",  #_resam_each
+           width = width, height = height)
+print(p_rank)
+dev.off()
 
 # compare pathfinder with ADVI #
 summary(w_d_matrix[, "pf"] / w_d_matrix[, "meanfield"])
 summary(w_d_matrix[, "pf"] / w_d_matrix[, "fullrank"])
 summary(w_d_matrix[, "pf"] / w_d_matrix[, "meanfield center"])
-summary(w_d_matrix[, "pf_4_IR"] / w_d_matrix[, "meanfield"])
-summary(w_d_matrix[, "pf_4_IR"] / w_d_matrix[, "fullrank"])
-summary(w_d_matrix[, "pf_4_IR"] / w_d_matrix[, "meanfield center"])
+summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "meanfield"])
+summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "fullrank"])
+summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "meanfield center"])
 
 ## one plot ##
-summary(w_d_matrix[, "pf_4_IR"] / w_d_matrix[, "PhI"])
-ratios <- c(w_d_matrix[, c("pf", "pf_4_IR", "PhI", "meanfield", 
+summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "PhI"])
+ratios <- c(w_d_matrix[, c("pf", "pf_20_IR", "PhI", "meanfield", 
                            "meanfield center", "fullrank")] / 
-              w_d_matrix[, "pf_4_IR"])
+              w_d_matrix[, "pf_20_IR"])
 ratios[ratios > 2^10] <- 2^10
 w_d_dat = data.frame(ratios = ratios,
                      label = c(
                        rep("pathfinder", length(model_record)), 
-                       rep("pathfinder IR with 4 runs", length(model_record)),
+                       rep("multi-path pathfinder", length(model_record)),
                        rep("Stan Phase I", length(model_record)),
                        rep("mean-field ADVI", length(model_record)),
                        rep("mean-field center", length(model_record)),
@@ -116,6 +164,7 @@ table(mean_M_wd_mf < 0.5)
 ratio_M_wd_fr <- (apply(W_d_100_ADVI_fr, 2, f <- function(x){quantile(x, 0.5)})/
                     apply(W_d_100_pf, 2, f <- function(x){quantile(x, 0.5)}))
 
+mean(ratio_M_wd_fr)
 table(ratio_M_wd_fr > 2)
 table(ratio_M_wd_fr < 0.5)
 
@@ -129,27 +178,29 @@ table((ratio_M_wd_fr < 0.5) & (ratio_M_wd_mf < 0.5))
 table((mean_M_wd_fr > 2) & (mean_M_wd_mf > 2))
 table((mean_M_wd_fr < 0.5) & (mean_M_wd_mf < 0.5))
 
-
-w_d_median_pf <- rep(apply(W_d_100_pf, 2, median), each = M)
-apply(W_d_100_ADVI_mf / w_d_median_pf, 2, median)
-apply(W_d_100_ADVI_fr / w_d_median_pf, 2, median)
-w_d_scaled = c(c(W_d_100_pf / w_d_median_pf), 
-               c(W_d_100_ADVI_mf / w_d_median_pf), 
-               c(W_d_100_ADVI_fr / w_d_median_pf))
+w_d_median_pf_IR <- rep(apply(W_d_100_pf_IR, 2, median), each = M)
+apply(W_d_100_pf / w_d_median_pf_IR, 2, median)
+apply(W_d_100_ADVI_mf / w_d_median_pf_IR, 2, median)
+apply(W_d_100_ADVI_fr / w_d_median_pf_IR, 2, median)
+w_d_scaled = c(c(W_d_100_pf_IR / w_d_median_pf_IR),
+               c(W_d_100_pf / w_d_median_pf_IR), 
+               c(W_d_100_ADVI_mf / w_d_median_pf_IR), 
+               c(W_d_100_ADVI_fr / w_d_median_pf_IR))
 w_d_scaled[w_d_scaled >= 2^12] <- 2^12
 df <- data.frame(w_d = w_d_scaled,
-                 model = rep(rep(pn[model_record], each = M), 3),
-                 type = rep(c("pathfinder", "mean-field ADVI", "dense ADVI"), 
+                 model = rep(rep(pn[model_record], each = M), 4),
+                 type = rep(c("multi-path pathfinder", "pathfinder", 
+                              "mean-field ADVI", "dense ADVI"), 
                             each = length(model_record)*M))
 
 
-# w_d_PhI_scaled <- c(w_d_summary[, "PhI"] / apply(W_d_100_pf, 2, median))
+# w_d_PhI_scaled <- c(w_d_summary[, "PhI"] / w_d_median_pf_IR)
 # w_d_point = data.frame(w_d_PhI_scaled = w_d_PhI_scaled,
 #                        model = pn[model_record], 
 #                        point = rep("Stan Phase I", length(model_record)))
 
 width <- 12.0
-height <- 8.0
+height <- 13.0
 setEPS()
 postscript("../pics/phI_adapt_default/W_d_box_compar_100_each.eps",  #_resam_each
            width = width, height = height)
@@ -179,11 +230,9 @@ dev.off()
 
 
 ## computational cost comparision ##
-#load("../results/lp_posteriordb_phI_adapt_set30.RData") # Pathfinder #_resam_all #_resam_each
 load("../results/lp_posteriordb_phI_adapt_default.RData") # Pathfinder #_resam_all #_resam_each
 load("../results/PhI_100_h10.RData")
 load("../results/ADVI_100.RData")
-
 
 pathfinder_fn_call <- 
   sapply(lp_opath, f <- function(x){
@@ -266,12 +315,7 @@ dev.off()
 ## 100 for each ##
 load("../results/wasserstein_100_default.RData")
 W_d_100_pf_default <- W_d_100_pf
-load("../results/wasserstein_100_short_L.RData")
-W_d_100_pf_short_L <- W_d_100_pf
-load("../results/wasserstein_100_large_K.RData")
-W_d_100_pf_large_K <- W_d_100_pf
-load("../results/wasserstein_100_long_hist.RData")
-W_d_100_pf_long_hist <- W_d_100_pf
+load("../results/wasserstein_100_sen.RData")
 
 
 ## Number of monte carlo samples in ELBO estimation ##
@@ -304,7 +348,7 @@ df <- data.frame(w_d = w_d_scaled,
                  model = rep(rep(pn[model_record], each = M), 2),
                  type = rep(c("Lmax = 1000, tol = 1e-13, K = 30, J = 6", 
                               "Lmax = 1000, tol = 1e-13, K = 5, J = 6"), 
-                   each = length(model_record)*M))
+                            each = length(model_record)*M))
 
 
 width <- 12.0
@@ -367,10 +411,10 @@ dev.off()
 ## history size ##
 mean((apply(W_d_100_pf_long_hist, 2, f <- function(x){quantile(x, 0.5)}) / 
         apply(W_d_100_pf_default, 2, f <- function(x){quantile(x, 0.5)}))[c(-5, -8)])
-# 0.9763456
+# 0.9496337
 median((apply(W_d_100_pf_long_hist, 2, f <- function(x){quantile(x, 0.5)}) / 
           apply(W_d_100_pf_default, 2, f <- function(x){quantile(x, 0.5)}))[c(-5, -8)])
-# 0.9560745
+# 0.9541166
 range((apply(W_d_100_pf_long_hist, 2, f <- function(x){quantile(x, 0.5)}) / 
          apply(W_d_100_pf_default, 2, f <- function(x){quantile(x, 0.5)}))[c(-5, -8)])
 # 0.8065852 1.4026032
@@ -504,8 +548,7 @@ get_init_optim <- function(ind){
 }
 
 
-## plots for section 3.2 ##
-# 8 school centered #
+## plots for case studies ##
 get_opt_tr <- function(opath){
   
   ###
@@ -527,13 +570,14 @@ get_opt_tr <- function(opath){
   return(list(opt_tr = opt_tr, ind_tr = ind_tr, tr_id = tr_id))
 }
 
-opt_tr_res <- get_opt_tr(opath)#opath #lp_opath[[15]]$opath
-check_dim <- c(8, 10)
-
+# 8 school centered #
 ## run main_pf with i = 15, seed_list = 1:20, sample with PSIS WOR for 20 inits
 # run wasserstain_check with i = 15 and generate the plots
 # then
 ## run main_pf.R with init_bound = 15.0 and generate the plots
+opt_tr_res <- get_opt_tr(opath)#opath #lp_opath[[15]]$opath
+check_dim <- c(8, 10)
+
 dta_sam <- data.frame(sam_x = pick_samples[check_dim[1], ],
                       sam_y = pick_samples[check_dim[2], ])
 
@@ -560,11 +604,11 @@ p_check <- ggplot(dta_check, aes(x=x, y=y) ) +
   )
 
 p_check
-setEPS()
-postscript("../pics/phI_adapt_default/8-school_points22.eps",  #8-school_points22.eps
-           width = 5.0, height = 5.0)
-print(p_check)
-dev.off()
+ggsave("8-school_points22.eps", #"8-school_opt_tr22.eps"
+       plot = p_check,
+       device = cairo_ps,
+       path = "../pics/phI_adapt_default/",
+       width = 5.0, height = 5.0, units = "in")
 
 p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
@@ -595,14 +639,12 @@ ggsave("8-school_opt_tr22.eps", #"8-school_opt_tr22.eps"
 ## run main_pf with i = 3, seed_list = 1:20, sample with PSIS WOR for 20 inits
 # run wasserstain_check with i = 3 and generate the plots
 opt_tr_res <- get_opt_tr(opath)
-check_dim <- c(4, 6)  #24
+check_dim <- c(4, 6)  
 dta_sam <- data.frame(sam_x = pick_samples[check_dim[1], ],
                       sam_y = pick_samples[check_dim[2], ])
 
 dta_check <- data.frame(x = ref_samples[, check_dim[1]],
                         y = ref_samples[, check_dim[2]])
-
-
 
 dta_phI <- data.frame(x = PhaseI_last_draw[[3]][, check_dim[1]],
                       y = PhaseI_last_draw[[3]][, check_dim[2]])
@@ -626,13 +668,13 @@ p_check <- ggplot(dta_check, aes(x=x, y=y) ) +
   theme(
     legend.position='none'
   )
-
 p_check
-setEPS()
-postscript("../pics/phI_adapt_default/3_points.eps",  #_resam_each
-           width = 5.0, height = 5.0)
-print(p_check)
-dev.off()
+ggsave("3_points.eps",
+       plot = p_check,
+       device = cairo_ps,
+       path = "../pics/phI_adapt_default/",
+       width = 5.0, height = 5.0, units = "in")
+
 
 p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
@@ -671,17 +713,18 @@ p_phI <- ggplot(dta_check, aes(x=x, y=y) ) +
   )
 
 p_phI
-setEPS()
-postscript("../pics/phI_adapt_default/3_phI.eps",  #_resam_each
-           width = 5.0, height = 5.0)
-print(p_phI)
-dev.off()
+ggsave("3_phI.eps",
+       plot = p_phI,
+       device = cairo_ps,
+       path = "../pics/phI_adapt_default/",
+       width = 5.0, height = 5.0, units = "in")
+
 
 # non-identifiable problem #
 ## run main_pf with i = 32, seed_list = 1:20, sample with PSIS WOR for 20 inits
 ## run wasserstain_check with i = 32 
 opt_tr_res <- get_opt_tr(opath)
-check_dim <- c(45, 46)# c(1, 2) #c(43, 44) #c(45, 46) #  c(3, 4)
+check_dim <- c(45, 46) # c(1, 2) #c(43, 44) #c(45, 46) #  c(3, 4)
 dta_sam <- data.frame(sam_x = pick_samples[check_dim[1], ],
                       sam_y = pick_samples[check_dim[2], ])
 
@@ -712,11 +755,11 @@ p_check <- ggplot(dta_check, aes(x=x, y=y) ) +
   )
 
 print(p_check)
-setEPS()
-postscript("../pics/phI_adapt_default/32_points.eps",  #_resam_each
-           width = 5.0, height = 5.0)
-print(p_check)
-dev.off()
+ggsave("32_points.eps",
+       plot = p_check,
+       device = cairo_ps,
+       path = "../pics/phI_adapt_default/",
+       width = 5.0, height = 5.0, units = "in")
 
 p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
@@ -735,8 +778,6 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
     legend.position='none'
   )
 print(p_check1)
-
-
 ggsave("32_opt_tr.eps",
        plot = p_check1,
        device = cairo_ps,
@@ -755,11 +796,12 @@ p_phI <- ggplot(dta_check, aes(x=x, y=y) ) +
   )
 
 p_phI
-setEPS()
-postscript("../pics/phI_adapt_default/32_phI.eps",  #_resam_each
-           width = 5.0, height = 5.0)
-print(p_phI)
-dev.off()
+ggsave("32_phI.eps",
+       plot = p_phI,
+       device = cairo_ps,
+       path = "../pics/phI_adapt_default/",
+       width = 5.0, height = 5.0, units = "in")
+
 
 opt_tr_res <- get_opt_tr(opath)
 check_dim <- c(1, 2)# c(1, 2) #c(43, 44) #c(45, 46) #  c(3, 4)
@@ -904,10 +946,13 @@ ggsave("32_opt_tr_12_2.eps",
        path = "../pics/phI_adapt_default/",
        width = 5.0, height = 5.0, units = "in")
 
+
 # non-Gaussian problem #
-# i = 18
+## run main_pf with i = 18, seed_list = 1:20, sample with PSIS WOR for 20 inits
+## run wasserstain_check with i = 18 
+
 opt_tr_res <- get_opt_tr(opath)
-check_dim <- c(2, 3)#c(2, 3)
+check_dim <- c(2, 3)
 dta_sam <- data.frame(sam_x = pick_samples[check_dim[1], ],
                       sam_y = pick_samples[check_dim[2], ])
 
@@ -968,11 +1013,10 @@ ggsave("18_opt_tr.eps",
        width = 5.0, height = 5.0, units = "in")
 
 
-## check plots ##
+## codes for checking ##
 opt_tr_res <- get_opt_tr(opath)
 for(first_check in 1:6){
   check_dim <- c(2 * first_check - 1, 2 * first_check)
-  check_dim <- c(2, 3)#c(2, 3)
   cat(check_dim, "\n")
   dta_sam <- data.frame(sam_x = pick_samples[check_dim[1], ],
                         sam_y = pick_samples[check_dim[2], ])
@@ -1043,10 +1087,11 @@ for(first_check in 1:6){
   
   p_phI
 }
-#1,2, 3,4, 6
-## plots for section 2.4 ##
+
+
+## plots for wasserstein distance illustration ##
 ## run wasserstain_check with i = 6 
-# 0.03386512 vs  # 0.01100075
+# 0.03386512 vs  # 0.01372514
 pick_samples_center <- ADVI_meanfield_center[[i]]
 a_center = wpp(t(pick_samples_center), 
                mass = rep(1 / ncol(pick_samples_center), ncol(pick_samples_center)))
@@ -1057,7 +1102,7 @@ pick_samples <- lp_opath[[i]]$pick_samples
 a = wpp(t(pick_samples), 
         mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
 b = wpp(ref_samples, mass = rep(1 / nrow(ref_samples), nrow(ref_samples)))
-w_d_pf <- wasserstein(a, b, p = 2); w_d_pf #0.01100075
+w_d_pf <- wasserstein(a, b, p = 2); w_d_pf #0.01372514
 
 check_dim <- c(1, 2)
 dta_sam <- data.frame(sam_x = pick_samples[check_dim[1], ],
@@ -1072,7 +1117,7 @@ dta_check <- data.frame(x = ref_samples[, check_dim[1]],
 p_check <- ggplot(dta_check, aes(x=x, y=y) ) +
   stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
   scale_fill_distiller(palette=4, direction=-1) +
-  scale_x_continuous(expand = c(0, 0), limits = c(-0.45, -0.26)) +
+  scale_x_continuous(expand = c(0, 0), limits = c(-0.45, -0.25)) +
   scale_y_continuous(expand = c(0, 0), limits = c(-0.03, 0.16)) +
   geom_point(data = dta_sam, aes(x=sam_x, y=sam_y), colour="red", size = 3) +
   xlab("") + ylab("") +
@@ -1091,7 +1136,7 @@ ggsave("6-dog_pf.eps",
 p_check_c <- ggplot(dta_check, aes(x=x, y=y) ) +
   stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
   scale_fill_distiller(palette=4, direction=-1) +
-  scale_x_continuous(expand = c(0, 0), limits = c(-0.45, -0.26)) + 
+  scale_x_continuous(expand = c(0, 0), limits = c(-0.45, -0.25)) + 
   scale_y_continuous(expand = c(0, 0), limits = c(-0.03, 0.16)) + 
   geom_point(data = dta_sam_center, aes(x=sam_x, y=sam_y),
              colour="red", size = 3) +
