@@ -1,6 +1,7 @@
 library(loo)
 library(Matrix)
 library(matrixStats)
+library(optimx)
 printf <- function(msg, ...) cat(sprintf(msg, ...), "\n")
 
 to_posterior <- function(model, data) {
@@ -55,19 +56,44 @@ opt_path <- function(init, fn, gr,
     }
     tryCatch(y[1, D + 1] <- -fn(y[1, 1:D]), 
              error = function(e) { LBFGS_fail <<- TRUE})
-    if(LBFGS_fail){next}
+    if(LBFGS_fail | is.infinite(y[1, D + 1])){
+      LBFGS_fail <- TRUE
+      fn_call = fn_call + 1  # record the evaluation of log-density of ill initials
+      next}
+    g1 <- gr(y[1, 1:D]) # record the gradient of initials
+    if(any(is.na(g1))){
+      gr_call = gr_call + 1  # record the evaluation of gradient of ill initials
+      LBFGS_fail <- TRUE
+      next
+    }
     tryCatch(
       my_data <- capture.output(
-        tt <- optim(par = y[1, 1:D],
-                    fn = fn,  # negate for maximization
-                    gr = gr,
-                    method = "L-BFGS-B",
-                    control = list(maxit = N1, 
-                                   pgtol = 0.0, 
-                                   factr = factr_tol,
-                                   trace = 6, REPORT = 1, lmm = lmm))
-      ), 
+        tt <- optimx(par = y[1, 1:D],
+                     fn = fn,  # negate for maximization
+                     gr = gr,
+                     method = "L-BFGS-B",
+                     control = list(maxit = N1, 
+                                    pgtol = 0.0, 
+                                    factr = factr_tol,
+                                    trace = 6, REPORT = 1, lmm = lmm)),
+        type = "output"), 
       error = function(e) { LBFGS_fail <<- TRUE})
+    if(LBFGS_fail){ # fail the section of code that does the checking
+      fn_call = fn_call + 1
+      gr_call = gr_call + 1
+      next}
+    if(tt$convcode == 9999){
+      LBFGS_fail <- TRUE
+      splited_output = unlist(lapply(my_data, f <- function(x){
+        strsplit(as.character(x),split = " ")}))
+      
+      line_search_ind = which(splited_output == "SEARCH") + 1 # check line seach times the 
+      
+      eval_count <- sum(as.numeric(splited_output[line_search_ind])) + 
+        length(line_search_ind) + 1
+      fn_call = fn_call + eval_count  
+      gr_call = gr_call + eval_count
+    }
   }
   
   # recover the optimization trajectory X and gradient G.
@@ -77,11 +103,11 @@ opt_path <- function(init, fn, gr,
   
   G_ind = which(splited_output == "G") + 2
   Iter = length(G_ind);
-  if(tt$convergence == 0){Iter = Iter - 1}
+  if(tt$convcode == 0){Iter = Iter - 1}
   X = matrix(NA, nrow = Iter + 1, ncol = D)
   G = matrix(NA, nrow = Iter + 1, ncol = D)
   X[1, ] = y[1, 1:D]
-  G[1, ] = gr(y[1, 1:D])  # add this since we cannot retrieve the gradient of the initial 
+  G[1, ] = g1  # add this since we cannot retrieve the gradient of the initial 
   for(g in 1:Iter){
     X[g + 1, ] = as.numeric(splited_output[(G_ind[g] - D - 2):(G_ind[g] - 3)])
     G[g + 1, ] = as.numeric(splited_output[G_ind[g]:(G_ind[g] + D - 1)])
@@ -94,8 +120,8 @@ opt_path <- function(init, fn, gr,
   # save results
   fn_ls <- apply(X, 1, fn)         # record fn of the optimization trajectory
   y = rbind(y, cbind(X, -fn_ls))   # update y
-  fn_call <- tt$counts[1]          # record the calls of fn in L-BFGS
-  gr_call <- tt$counts[2]          # record the calls of gr in L-BFGS
+  fn_call <- fn_call + tt$fevals          # record the calls of fn in L-BFGS
+  gr_call <- gr_call + tt$gevals          # record the calls of gr in L-BFGS
   
   # estimate DIV for all approximating Gaussians and save results of the one with maximum DIV
   DIV_ls <-  c()
@@ -142,7 +168,7 @@ opt_path <- function(init, fn, gr,
                 fn_call = fn_call,                 # no. calls of log density
                 gr_call = gr_call,                 # no. calls of gradient
                 status = "mode"                    # status of the one-path pathfinder
-                ))
+    ))
   }
   
   ## Generate upto N_sam samples from the picked approximating Normal ##
@@ -259,7 +285,7 @@ opt_path_stan_init_parallel <- function(init_ls, mc.cores, model, data,
                                         N_sam_DIV = 5, N_sam = 100, 
                                         factr_tol = 1e2, lmm = 6,
                                         seed_list){
-
+  
   #' Run one-path Pathfinder with a given list of initials in parallel
   #'
   #' @param init_ls        the list of initials 
@@ -629,6 +655,32 @@ Imp_Resam_Each <- function(param_path, seed){
                         pick_ind <- sample(1:length(psis_w),
                                            replace = TRUE,
                                            size = 1, prob = psis_w)
+                        EX_est <- samples[, pick_ind]
+                      }
+                      return(EX_est)})
+  Sample_Each = do.call("cbind", EX_ests)
+  return(Sample_Each)
+}
+
+random_sample_Each <- function(param_path, seed){
+  
+  #' random sample for one-path Pathfinder 
+  #'  
+  #' @param param_path output of function opt_path_stan_parallel()
+  #' @param seed       random seed 
+  
+  set.seed(seed)
+  
+  # sample using importance sampling
+  EX_ests <- lapply(param_path, 
+                    f <- function(x){
+                      if(x$status == "mode"){ # return mode
+                        EX_est <- x$y[nrow(x$y), -ncol(x$y)]
+                      } else {
+                        lrms <- extract_log_ratio(x)
+                        samples <- extract_samples(x)
+                        finit_ind <- which(is.finite(lrms))
+                        pick_ind <- sample(finit_ind, size = 1)
                         EX_est <- samples[, pick_ind]
                       }
                       return(EX_est)})
