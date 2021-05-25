@@ -199,14 +199,16 @@ for(i in 1:length(model_record)){
 save(file = "../results/lp_posteriordb_LBFGS_h6.RData",
      list = c("lp_LBFGS_n_fn", "lp_LBFGS_n_gr", "initial_ls", "lp_INV",
               "lp_mean", "model_record"))
-load(file = "../results/lp_posteriordb_LBFGS_h10.RData")
+
+# check the output #
+load(file = "../results/lp_posteriordb_LBFGS_h6.RData")
 
 ## check the distribution of number of iterations ##
 n_grfn <- colMeans(abs(lp_LBFGS_n_gr))
-mean(n_grfn) # 35.25  # 38.8898
-median(n_grfn) # 30.55 # 30.55
-sd(n_grfn)   # 23.75 #42.33
-sd(abs(lp_LBFGS_n_gr)) # 25.38 #44.07
+mean(n_grfn) # 41.67  
+median(n_grfn) # 31.05
+sd(n_grfn)   # 53.80
+sd(abs(lp_LBFGS_n_gr)) # 56.02
 jpeg(filename = paste0("../pics/hist_LBFGS_grfn_counts.jpeg"),
      width = width, height = height, units = "px", pointsize = 12)
 hist(abs(lp_LBFGS_n_gr), breaks = 100, 
@@ -214,28 +216,22 @@ hist(abs(lp_LBFGS_n_gr), breaks = 100,
      xlab = "iterations")
 dev.off()
 
-
-#' only diamonds have counts > 200
 table(model_record[as.integer(which(abs(lp_LBFGS_n_gr)>200) / M - 0.5 / M) + 1])
-# 6 
-# 20
+#6 27 41 
+#20  1  3
 
-### need to load data for phase I to get the result ###
-
-# boxplot of counts
+# boxplot of counts 
 df <- data.frame(n_counts = c(abs(lp_LBFGS_n_gr)),
-                 n_leapfrogs = c(lp_explore_n_leapfrog),
                  model = rep(pn[model_record], each = M),
                  not_reach_target = 
                    rep(apply(lp_LBFGS_n_gr, 2, 
                              f <- function(x){as.numeric(any(x < 0))}), 
                        each = M))
 
-
 jpeg(filename = paste0("../pics/box_LBFGS_gr_counts_log.jpeg"),
      width = width*1.3, height = height*2, units = "px", pointsize = 12)
 p_box_iter <- df %>% mutate( type=ifelse(not_reach_target == 1, "Highlighted","Normal")) %>%
-  ggplot( aes(y = reorder(model, n_leapfrogs, FUN = median), 
+  ggplot( aes(y = model, 
               x = n_counts, fill=type, alpha=type)) + 
   geom_boxplot() + 
   scale_x_log10() + ylab("") + xlab("No. calls to fn and gr") + 
@@ -257,4 +253,3 @@ p_hist <- ggplot(df, aes(x = n_counts)) +
   xlab("No. calls to fn and gr") 
 print(p_hist)
 dev.off()
-

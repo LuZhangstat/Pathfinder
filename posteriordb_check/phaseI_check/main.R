@@ -11,7 +11,7 @@ library(posterior)
 library(ggplot2)
 library(cmdstanr)
 library(bayesplot)
-source("../utils/sim.R")
+source("../utils/sim_pf.R")
 source("../utils/lp_utils.R")
 
 set.seed(123)
@@ -27,7 +27,7 @@ width = 600; height = 500 # the size of the plot
 mc.cores = parallel::detectCores() - 2
 sample_seed = 1234
 
-load(file = "../results/lp_posteriordb_LBFGS_h10.RData")
+load(file = "../results/lp_posteriordb_LBFGS_h6.RData")
 
 # preallocate results #
 lp_explore_n_iters <- array(data = NA, dim = c(M, length(model_record)))
@@ -178,11 +178,12 @@ for(i in 41:49){ #20 length(model_record)
   dev.off()
 }
 
-save(file = "../results/lp_posteriordb_explore_h10.RData",
+save(file = "../results/lp_posteriordb_explore_h6.RData",
      list = c("lp_explore_n_iters", "lp_explore_n_leapfrog", "lp_data", 
               "PhaseI_last_draw", "PhI_leapfrog_counts"))
 
-# load("../results/lp_posteriordb_explore_h10.RData")
+# check the output #
+load("../results/lp_posteriordb_explore_h6.RData")
 
 ## check the distribution of number of iterations ##
 n_iters_mean <- colMeans(lp_explore_n_iters)
@@ -198,7 +199,7 @@ hist(lp_explore_n_iters, breaks = 100,
 dev.off()
 
 
-#' Around 96.7% of phase I MCMC chains reach the target interval within 200 '
+#' Around 96.5% of phase I MCMC chains reach the target interval within 200 '
 #' iterations. 
 sum((lp_explore_n_iters <= 200), na.rm = TRUE) / 
   sum(!is.na(lp_explore_n_iters))
@@ -207,8 +208,8 @@ sum((lp_explore_n_iters <= 200), na.rm = TRUE) /
 #' fail to reach the target interval within 1000 iters
 table(model_record[as.integer(which(lp_explore_n_iters == L) / M - 0.5 / M) 
                    + 1])
-# 3  9 41 
-# 1 20  1  
+#9 41 
+#20  1 
 
 
 ## check the distribution of sum of leapfrogs ##
@@ -236,36 +237,36 @@ print(p_leapfrog)
 dev.off()
 
 
-#' Around 80.6% of phase I MCMC chains spend less than 4000
+#' Around 79.7% of phase I MCMC chains spend less than 4000
 #' leapfrogs for lp__ to reach the 99% posterior interval.
 sum((lp_explore_n_leapfrog <= 4000), na.rm = TRUE) / 
   sum(!is.na(lp_explore_n_leapfrog))
 mean(lp_explore_n_leapfrog[which(lp_explore_n_leapfrog < 4e3)])
-#[1] 836.3392
+#[1] 789.7
 median(lp_explore_n_leapfrog[which(lp_explore_n_leapfrog < 4e3)])
-# [1] 370.5
+# [1] 336
 sd(lp_explore_n_leapfrog[which(lp_explore_n_leapfrog < 4e3)])
-#[1] 957.9834
+#[1] 928.7
 
 
-#' Around 96.6% of phase I MCMC chains spend less than 30,000
+#' Around 96.9% of phase I MCMC chains spend less than 30,000
 #' leapfrogs for lp__ to reach the 99% posterior interval
 sum((lp_explore_n_leapfrog <= 3e4), na.rm = TRUE) / 
   sum(!is.na(lp_explore_n_leapfrog))
 
 mean(lp_explore_n_leapfrog[which(lp_explore_n_iters < 200)])
-# [1] 3214.378
+# [1] 3186.357
 median(lp_explore_n_leapfrog[which(lp_explore_n_iters < 200)])
-# [1] 557
+# [1] 475.5
 sd(lp_explore_n_leapfrog[which(lp_explore_n_iters < 200)])
-# [1] 6959.813
+# [1] 6669.635
 
 #' The 3th, 9th, 14th and 37th model have phase I MCMC chains
 #' fail to reach the target interval within 30,000 leapfrogs
 table(model_record[as.integer(which(lp_explore_n_leapfrog > 3e4) / M - 0.5 / M) 
                    + 1])
-# 3  9 11 14 37 
-# 1 20  3  1  8
+#9 11 14 37 48 
+#20  3  1  5  1
 
 
 #' check the histogram of number of leapfrogs, distribution of the sum of 
