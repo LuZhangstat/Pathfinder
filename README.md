@@ -14,12 +14,3 @@
 
 
 
-
-## use stat_comp_benchmarks to test fitting results
-1) Fit the model in the main folder and then generate results in stat_comp_benchmarks/empirical_results/adapt/gp_regr.fit
-
-2) Then go to stat_comp_benchmarks and run ./evaluate
-
-
-
-
