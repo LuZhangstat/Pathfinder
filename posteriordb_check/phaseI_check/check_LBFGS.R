@@ -10,7 +10,7 @@ library(posteriordb)
 library(posterior)
 library(ggplot2)
 library(dplyr)
-source("../utils/sim.R")
+source("../utils/sim_pf.R")
 source("../utils/lp_utils.R")
 
 set.seed(123)
