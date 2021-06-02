@@ -1,0 +1,18 @@
+{
+  "name": "blr",
+  "title": "A Bayesian linear regression model with vague priors",
+  "description": "A Bayesian linear regression model with vague priors.",
+  "keywords": [],
+  "references": null,
+  "urls": [],
+  "prior": {
+    "keywords": []
+  },
+  "model_implementations": {
+    "stan": {
+      "model_code": "models/stan/blr.stan"
+    }
+  },
+  "added_by": "Mans Magnusson",
+  "added_date": "2019-11-29"
+}
