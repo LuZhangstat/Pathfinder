@@ -36,7 +36,7 @@ Authors
 | Name   | Email       |              |
 |:------ |:----------- | :----------- |
 | Lu Zhang | lz2786@columbia.edu        | Ph.D.  Columbia Univeristy, Statistics |
-| Bob Carpenter | bcarpenter@flatironinstitute.org       | Ph.D., Flatiron Institute |
+| Bob Carpenter | bcarpenter@flatironinstitute.org       | Ph.D. Flatiron Institute |
 
 
 
