@@ -14,7 +14,8 @@ opt_path <- function(init, fn, gr,
                      init_bound = 2.0,
                      N1 = 1000,
                      N_sam_DIV = 5, N_sam = 100,
-                     factr_tol = 1e2, lmm = 6, seed = 1234) {
+                     factr_tol = 1e2, lmm = 6, seed = 1234,
+                     eval_lp_draws = TRUE) {
   
   #' Run one-path Pathfinder for initialization init 
   #' 
@@ -29,6 +30,7 @@ opt_path <- function(init, fn, gr,
   #' @param factr_tol   the option factr in optim() (default = 1e2)
   #' @param lmm         the option lmm in optim() (default = 6)
   #' @param seed        random seed for one-path Pathfinder
+  #' @param eval_lp_draws logical; if TRUE (default) evaluate the log-densities of approximating draws
   #' @return 
   
   
@@ -175,20 +177,25 @@ opt_path <- function(init, fn, gr,
   if(N_sam > length(DIV_fit_pick$fn_draws)){
     draws_N_apx <- Sam_N_apx(sample_pkg_save, 
                              N_sam - length(DIV_fit_pick$fn_draws))
-    fn_draws_apx <- apply(draws_N_apx$samples, 2, 
-                          f <- function(x){
-                            ill_fn = FALSE
-                            tryCatch(
-                              nld <- fn(x),
-                              error = function(e) { ill_fn <<- TRUE})
-                            ifelse(ill_fn, Inf, nld)
-                          })
+    
     ## update the samples in DIV_save ##
     DIV_save$repeat_draws <- cbind(DIV_save$repeat_draws, draws_N_apx$samples)
     DIV_save$lp_approx_draws <- c(DIV_save$lp_approx_draws,
                                   draws_N_apx$lp_apx_draws)
-    DIV_save$fn_draws <- c(DIV_save$fn_draws, fn_draws_apx)
-    fn_call = fn_call +  N_sam - length(DIV_fit_pick$fn_draws)
+    
+    if(eval_lp_draws == TRUE){
+      # if evaluate the log-density of approximating draws
+      fn_draws_apx <- apply(draws_N_apx$samples, 2, 
+                            f <- function(x){
+                              ill_fn = FALSE
+                              tryCatch(
+                                nld <- fn(x),
+                                error = function(e) { ill_fn <<- TRUE})
+                              ifelse(ill_fn, Inf, nld)
+                            })
+      DIV_save$fn_draws <- c(DIV_save$fn_draws, fn_draws_apx)
+      fn_call = fn_call +  N_sam - length(DIV_fit_pick$fn_draws)
+    }
   }
   
   return(list(sample_pkg_save = sample_pkg_save, 
@@ -202,7 +209,8 @@ opt_path <- function(init, fn, gr,
 
 opt_path_stan <- function(model, data, init_bound = 2, N1 = 1000,
                           N_sam_DIV = 5, N_sam = 100,
-                          factr_tol = 1e2, lmm = 6, seed = 1234) {
+                          factr_tol = 1e2, lmm = 6, seed = 1234,
+                          eval_lp_draws = TRUE){
   
   #' Run one-path Pathfinder for specified Stan model and data for
   #' the specified number of iterations using the specified bound on
@@ -219,6 +227,7 @@ opt_path_stan <- function(model, data, init_bound = 2, N1 = 1000,
   #' @param factr_tol      the option factr in optim() (default = 1e2)
   #' @param lmm            the option lmm in optim() (default = 6)
   #' @param seed           random seed for generating initials
+  #' @param eval_lp_draws  logical; if TRUE (default) evaluate the log-densities of approximating draws
   #' @return 
   
   posterior <- to_posterior(model, data)
@@ -232,14 +241,15 @@ opt_path_stan <- function(model, data, init_bound = 2, N1 = 1000,
   
   out <- opt_path(init, fn = fn, gr = gr, N1 = N1, N_sam_DIV = N_sam_DIV,
                   N_sam = N_sam, factr_tol = factr_tol,
-                  lmm = lmm, seed = seed)
+                  lmm = lmm, seed = seed, eval_lp_draws = eval_lp_draws)
   return(out)
 }
 
 opt_path_stan_parallel <- function(seed_init, seed_list, mc.cores, model, data, 
                                    init_bound = 2.0, N1 = 1000, 
                                    N_sam_DIV = 5, N_sam = 100, 
-                                   factr_tol = 1e2, lmm = 6){
+                                   factr_tol = 1e2, lmm = 6,
+                                   eval_lp_draws = TRUE){
   
   #' Run one-path Pathfinder with random initials in parallel
   #'
@@ -255,6 +265,7 @@ opt_path_stan_parallel <- function(seed_init, seed_list, mc.cores, model, data,
   #'                       will not do extra samples when < N_sam_DIV  (default = 5)
   #' @param factr_tol      the option factr in optim() (default = 1e2)
   #' @param lmm            the option lmm in optim() (default = 6)
+  #' @param eval_lp_draws  logical; if TRUE (default) evaluate the log-densities of approximating draws
   #' @return 
   
   posterior <- to_posterior(model, data)
@@ -276,7 +287,7 @@ opt_path_stan_parallel <- function(seed_init, seed_list, mc.cores, model, data,
   out <- mclapply(list_ind, f <- function(x){
     opt_path(init = init[[x]] ,fn = fn, gr = gr, N1 = N1, N_sam_DIV = N_sam_DIV,
              N_sam = N_sam,  factr_tol = factr_tol,
-             lmm = lmm, seed = seed_list[x])
+             lmm = lmm, seed = seed_list[x], eval_lp_draws = eval_lp_draws)
   }, mc.cores = mc.cores)
 }
 
@@ -284,7 +295,7 @@ opt_path_stan_init_parallel <- function(init_ls, mc.cores, model, data,
                                         init_bound = 2.0, N1 = 1000, 
                                         N_sam_DIV = 5, N_sam = 100, 
                                         factr_tol = 1e2, lmm = 6,
-                                        seed_list){
+                                        seed_list, eval_lp_draws = TRUE){
   
   #' Run one-path Pathfinder with a given list of initials in parallel
   #'
@@ -300,6 +311,7 @@ opt_path_stan_init_parallel <- function(init_ls, mc.cores, model, data,
   #' @param factr_tol      the option factr in optim() (default = 1e2)
   #' @param lmm            the option lmm in optim() (default = 6)
   #' @param seed_list      array of random seeds for running one-path Pathfinder
+  #' @param eval_lp_draws  logical; if TRUE (default) evaluate the log-densities of approximating draws
   #' @return 
   
   posterior <- to_posterior(model, data)
@@ -316,7 +328,8 @@ opt_path_stan_init_parallel <- function(init_ls, mc.cores, model, data,
   out <- mclapply(list_ind, f <- function(x){
     opt_path(init = init_ls[[x]], fn = fn, gr = gr, N1 = N1,
              N_sam_DIV = N_sam_DIV, N_sam = N_sam, 
-             factr_tol = factr_tol, lmm = lmm, seed = seed_list[[x]])
+             factr_tol = factr_tol, lmm = lmm, seed = seed_list[[x]],
+             eval_lp_draws = eval_lp_draws)
   }, mc.cores = mc.cores)
 }
 
@@ -677,10 +690,11 @@ random_sample_Each <- function(param_path, seed){
                       if(x$status == "mode"){ # return mode
                         EX_est <- x$y[nrow(x$y), -ncol(x$y)]
                       } else {
-                        lrms <- extract_log_ratio(x)
+                        #lrms <- extract_log_ratio(x)
                         samples <- extract_samples(x)
-                        finit_ind <- which(is.finite(lrms))
-                        pick_ind <- sample(finit_ind, size = 1)
+                        #finit_ind <- which(is.finite(lrms))
+                        #pick_ind <- sample(finit_ind, size = 1)
+                        pick_ind <- sample(ncol(samples), size = 1)
                         EX_est <- samples[, pick_ind]
                       }
                       return(EX_est)})
