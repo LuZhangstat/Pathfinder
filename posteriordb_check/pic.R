@@ -29,7 +29,7 @@ height <- 8.0
 setEPS()
 postscript("../pics/box_compar_LBFGS_log.eps",  #_resam_each
            width = width, height = height)
-p_box_compar <- df %>% mutate(type= c("L-BFGS", "L-BFGS(multimodal)", 
+p_box_compar <- df %>% mutate(type= c("L-BFGS", "L-BFGS(have minor modes)", 
                                       "Stan Phase I")
                               [not_reach_target + 1]) %>%
   ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
@@ -77,24 +77,40 @@ round(rowMeans(rank_score), 1)
 
 # faceted rank histograms
 rank_dat = data.frame(rank = c(rank_score),
-                     label = rep(c("pathfinder", 
-                                   "multi-path pathfinder", 
-                                   "Stan Phase I",
-                                   "mean-field ADVI",
-                                   "mean-field center",
-                                   "dense ADVI"), length(model_record)))
+                      label = rep(c("pathfinder", 
+                                    "multi-path pathfinder", 
+                                    "Stan Phase I",
+                                    "mean-field ADVI",
+                                    "mean-field center",
+                                    "dense ADVI"), length(model_record)))
 
 p_rank <- ggplot(rank_dat, aes(x = rank)) + geom_histogram(bins = 6) + 
   facet_wrap(~label)
 p_rank
 width <- 8.0
 height <- 4.0
-
 setEPS()
 postscript("../pics/phI_adapt_default/rank_test.eps",  #_resam_each
            width = width, height = height)
 print(p_rank)
 dev.off()
+
+## rank comparision ##
+rank_M <- matrix(NA, 6, 6)
+method_names <- c("pf", "pf_20_IR", "PhI", "meanfield", 
+                  "meanfield center", "fullrank")
+for(A in 1:6){
+  for(B in 1:6){
+    rank_M[A, B] <- sum(w_d_matrix[, method_names[A]] < 
+                          w_d_matrix[, method_names[B]])
+  }
+}
+rownames(rank_M) <- c("pf <", "pf_20_IR <", "PhI <", "meanfield <", 
+                      "meanfield center <", "fullrank <")
+colnames(rank_M) <- c("pf", "pf_20_IR", "PhI", "meanfield", 
+                      "meanfield center", "fullrank")
+rank_M <- round(rank_M/49, 2)
+rank_M
 
 # compare pathfinder with ADVI #
 summary(w_d_matrix[, "pf"] / w_d_matrix[, "meanfield"])
@@ -150,6 +166,7 @@ dev.off()
 ## 100 for each ##
 load("../results/wasserstein_100_default.RData")
 
+# meanfield ADVI #
 ratio_M_wd_mf <- (apply(W_d_100_ADVI_mf, 2, f <- function(x){quantile(x, 0.5)})/
                     apply(W_d_100_pf, 2, f <- function(x){quantile(x, 0.5)}))
 
@@ -161,9 +178,15 @@ mean_M_wd_mf <- colMeans(W_d_100_ADVI_mf) / colMeans(W_d_100_pf)
 table(mean_M_wd_mf > 2)
 table(mean_M_wd_mf < 0.5)
 
+ratio_M_wd_mf_IR <- (apply(W_d_100_ADVI_mf, 2, f <- function(x){quantile(x, 0.5)})/
+                       apply(W_d_100_pf_IR, 2, f <- function(x){quantile(x, 0.5)}))
+mean(ratio_M_wd_mf_IR)
+mean_M_wd_mf_IR <- colMeans(W_d_100_ADVI_mf) / colMeans(W_d_100_pf_IR)
+
+
+# dense ADVI #
 ratio_M_wd_fr <- (apply(W_d_100_ADVI_fr, 2, f <- function(x){quantile(x, 0.5)})/
                     apply(W_d_100_pf, 2, f <- function(x){quantile(x, 0.5)}))
-
 mean(ratio_M_wd_fr)
 table(ratio_M_wd_fr > 2)
 table(ratio_M_wd_fr < 0.5)
@@ -172,11 +195,21 @@ mean_M_wd_fr <- colMeans(W_d_100_ADVI_fr) / colMeans(W_d_100_pf)
 table(mean_M_wd_fr > 2)
 table(mean_M_wd_fr < 0.5)
 
+ratio_M_wd_fr_IR <- (apply(W_d_100_ADVI_fr, 2, f <- function(x){quantile(x, 0.5)})/
+                       apply(W_d_100_pf_IR, 2, f <- function(x){quantile(x, 0.5)}))
+mean(ratio_M_wd_fr_IR)
+mean_M_wd_fr_IR <- colMeans(W_d_100_ADVI_fr) / colMeans(W_d_100_pf_IR)
+
+# check both #
 table((ratio_M_wd_fr > 2) & (ratio_M_wd_mf > 2))
 table((ratio_M_wd_fr < 0.5) & (ratio_M_wd_mf < 0.5))
 
-table((mean_M_wd_fr > 2) & (mean_M_wd_mf > 2))
+table((mean_M_wd_fr > 2) & (mean_M_wd_mf > 2) & (mean_M_wd_fr_IR > 2) & 
+        (mean_M_wd_mf_IR > 2)) # 31
 table((mean_M_wd_fr < 0.5) & (mean_M_wd_mf < 0.5))
+
+# check model bball_drive_event_0-hmm_drive_0 #
+mean(W_d_100_pf_IR[, 3]) / mean(W_d_100_pf[, 3])
 
 w_d_median_pf_IR <- rep(apply(W_d_100_pf_IR, 2, median), each = M)
 apply(W_d_100_pf / w_d_median_pf_IR, 2, median)
@@ -236,10 +269,11 @@ load("../results/ADVI_100.RData")
 
 pathfinder_fn_call <- 
   sapply(lp_opath, f <- function(x){
-    sapply(x$opath, g <- function(z){sum(z$fn_call)}) } )
+    sapply(x$opath, g <- function(z){z$fn_call})})
 pathfinder_gr_call <- 
   sapply(lp_opath, f <- function(x){
     sapply(x$opath, g <- function(z){sum(z$gr_call)}) } )
+
 
 summary(colSums(PhI_leapfrog_counts) / colSums(pathfinder_fn_call))
 summary(colSums(PhI_leapfrog_counts) / colSums(pathfinder_gr_call))
@@ -339,7 +373,7 @@ load("../results/lp_posteriordb_phI_adapt_default.RData")
 w_d_median_pf <- rep(apply(W_d_100_pf_default, 2, median), each = M)
 apply(W_d_100_pf_large_K / w_d_median_pf, 2, median)
 apply(W_d_100_pf_short_L / w_d_median_pf, 2, median)
-w_d_scaled = c(#c(W_d_100_pf_28 / w_d_median_pf), 
+w_d_scaled = c(
   c(W_d_100_pf_large_K / w_d_median_pf), 
   c(W_d_100_pf_default / w_d_median_pf))
 range(w_d_scaled)
@@ -451,6 +485,80 @@ p_box_compar <- df %>%
 print(p_box_compar)
 dev.off()
 
+## sensitivity test for I ##
+load("../results/wasserstein_100_default.RData")
+load("../results/wasserstein_100_sen_I.RData")
+
+ratio_M_wd_I5 <- (apply(W_d_100_pf_I5, 2, f <- function(x){quantile(x, 0.5)})/
+                    apply(W_d_100_pf_IR, 2, f <- function(x){quantile(x, 0.5)}))
+
+mean(ratio_M_wd_I5)
+range(ratio_M_wd_I5)
+table(ratio_M_wd_I5 > 2)
+table(ratio_M_wd_I5 < 0.5)
+
+mean_M_wd_I5 <- colMeans(W_d_100_pf_I5) / colMeans(W_d_100_pf_IR)
+table(mean_M_wd_I5 > 2)
+table(mean_M_wd_I5 < 0.5)
+
+ratio_M_wd_I40 <- (apply(W_d_100_pf_I40, 2, f <- function(x){quantile(x, 0.5)})/
+                     apply(W_d_100_pf_IR, 2, f <- function(x){quantile(x, 0.5)}))
+
+mean(ratio_M_wd_I40)
+range(ratio_M_wd_I40)
+table(ratio_M_wd_I40 > 2)
+table(ratio_M_wd_I40 < 0.5)
+
+mean_M_wd_I40 <- colMeans(W_d_100_pf_I40) / colMeans(W_d_100_pf_IR)
+table(mean_M_wd_I40 > 2)
+table(mean_M_wd_I40 < 0.5)
+
+w_d_median_pf_IR <- rep(apply(W_d_100_pf_IR, 2, median), each = M)
+apply(W_d_100_pf_I5 / w_d_median_pf_IR, 2, median)
+apply(W_d_100_pf_I40 / w_d_median_pf_IR, 2, median)
+
+# check variance #
+apply(W_d_100_pf_I5, 2, var) / apply(W_d_100_pf_IR, 2, var)
+mean((apply(W_d_100_pf_I5, 2, var) / apply(W_d_100_pf_IR, 2, var))[-3])
+mean((apply(W_d_100_pf_I40, 2, var) / apply(W_d_100_pf_IR, 2, var))[-3])
+which((apply(W_d_100_pf_I5, 2, var) / apply(W_d_100_pf_I40, 2, var)) > 4)
+summary(apply(W_d_100_pf_I40, 2, var) / apply(W_d_100_pf_IR, 2, var))
+range(apply(W_d_100_pf_IR, 2, var)/apply(W_d_100_pf_I40, 2, var))
+
+
+w_d_scaled = c(c(W_d_100_pf_I5 / w_d_median_pf_IR), 
+               c(W_d_100_pf_IR / w_d_median_pf_IR),
+               c(W_d_100_pf_I40 / w_d_median_pf_IR))
+w_d_scaled[w_d_scaled >= 2^12] <- 2^12
+df <- data.frame(w_d = w_d_scaled,
+                 model = rep(rep(pn[model_record], each = M), 3),
+                 type = rep(c("I = 5", "I = 20", "I = 40"), 
+                            each = length(model_record)*M))
+
+df$type <- factor(df$type , levels=c("I = 5", "I = 20", "I = 40"))
+
+width <- 12.0
+height <- 12.0
+setEPS()
+postscript("../pics/phI_adapt_default/W_d_box_sens_I.eps",  #_resam_each
+           width = width, height = height)
+p_box_compar <- df %>%
+  ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
+             x = w_d, color = type)) + 
+  geom_boxplot(outlier.size = 0.1) + 
+  scale_colour_manual(values=cbbPalette) + 
+  scale_x_continuous(trans = 'log2',
+                     limits = c(1/4, 16),
+                     breaks = c(1/4, 1/2, 1, 2, 4, 
+                                8, 16),
+                     labels = c("1/4", 
+                                "1/2", "1", "2", "4", "8", 
+                                "16")) + 
+  ylab("") + xlab("") + #xlab("calls to log density and gradient") + 
+  theme_bw(base_size = 12 )+
+  theme(legend.position="top", legend.title = element_blank()) 
+print(p_box_compar)
+dev.off()
 
 ## computational cost comparision ##
 load("../results/lp_posteriordb_phI_adapt_default.RData") # Pathfinder #_resam_all #_resam_each
