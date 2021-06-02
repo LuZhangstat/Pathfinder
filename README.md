@@ -14,10 +14,13 @@ Roadmap
 
 Instructions
 ---------
+(note: since the function **pdb_local()** requires folder posteriordb to be in a git repository, please use **git clone** to download the repository or configure a remote in the unzipped repository)
+
 #### HMC vs L-BFGS exam in Introduction:
 1. Optimization: posteriordb_check/phaseI_check/check_LBFGS.R
 2. Stan phase I: posteriordb_check/phaseI_check/main.R
 3. Plots: posteriordb_check/pic.R
+
 
 #### Experiements in Section 3:
 ##### 100 repeats for experiments in Section 3
