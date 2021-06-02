@@ -83,11 +83,12 @@ for(i in 1:49){ #length(model_record)
   t <- proc.time()
   opath <- opt_path_stan_parallel(seed_list, seed_list, mc.cores, model, data,
                                   init_bound = init_bound, N1, N_sam_DIV, N_sam, 
-                                  factr_tol, lmm) # plot for 8school init_bound = 15
+                                  factr_tol, lmm, eval_lp_draws = FALSE) # plot for 8school init_bound = 15
   print(proc.time() - t)
   # opath <- lp_opath[[i]]$opath
   
   pick_samples <- random_sample_Each(opath, seed = 1) # randomly pick one approximating draws for each run of Pathfinder
+  # need to run pathfinder with eval_lp_draws = TRUE
   # pick_samples <- Imp_Resam_Each(opath, seed = 1)   # use PSIS-IR to pick one approximating draws for each run of Pathfinder (no longer used in the paper)
   # pick_samples <- Imp_Resam_WOR(opath, n_inits = 20, seed = 1) # use PSIS-IR to pick n_inits distinct approximating draws for multi-path Pathfinder
 
@@ -96,8 +97,9 @@ for(i in 1:49){ #length(model_record)
 }
 proc.time() - t_0
 
-save(file = "../results/lp_posteriordb_phI_adapt_long_hist.RData",
-     list = c("lp_opath"))
+
+#save(file = "../results/lp_posteriordb_phI_adapt_long_hist.RData",
+#    list = c("lp_opath"))
 # _default
 # _short_L
 # _large_K
@@ -109,6 +111,21 @@ lapply(lp_opath, f <- function(x){ncol(x$pick_samples)})
 ## multi-path Pathfinder ##
 # preallocate results #
 lp_multi_opath <- c()
+
+I20 = TRUE
+if(I20 == TRUE){
+  I = 20
+}
+
+I5 = FALSE
+if(I5 == TRUE){
+  I = 5
+}
+
+I40 = FALSE
+if(I40 == TRUE){
+  I = 40
+}
 
 t_0 <- proc.time()
 for(i in 1:49){ #length(model_record)
@@ -136,21 +153,27 @@ for(i in 1:49){ #length(model_record)
   t <- proc.time()
   for(j in 1:100){
     cat(j, "\t")
-    seed_list = (j-1)*20 + 1:20
+    seed_list = (j-1)*I + 1:I
     opath <- opt_path_stan_parallel(seed_list, seed_list, mc.cores, model, data,
                                     init_bound = init_bound, N1, N_sam_DIV, N_sam, 
                                     factr_tol, lmm)
     pick_samples <- Imp_Resam_WOR(opath, n_inits = N_sam, seed = 1)
-    lp_multi_opath[[i]][[j]] <- pick_samples   # record the 100 samples 
+    
+    lp_multi_opath[[i]][[j]] <- list(opath = opath, pick_samples = pick_samples)
+    
+    #lp_multi_opath[[i]][[j]] <- pick_samples   # record the 100 samples 
   }
   print(proc.time() - t)
   
 }
 proc.time() - t_0
 
-save(file = "../results/multi_pf_samples_default.RData",
+save(file = "../results/multi_pf_samples_I20.RData",
      list = c("lp_multi_opath"))
 
+#_default
+#_I5
+#_I40   # 69436.82s
 
 ############### old code #######################
 # random sample 4 pathfinder + SIR WOR #
