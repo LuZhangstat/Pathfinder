@@ -726,6 +726,10 @@ constrain_draws <- function(unconstrain_draws, posterior){
 }
 
 extract_log_ratio <- function(param_path){
+  if(length(param_path$DIV_save$fn_draws)!=
+     length(param_path$DIV_save$lp_approx_draws)){
+    stop('length of log-densities for approximate draws does not match with the sample size, set option eval_lp_draws at TRUE before running importance resampling')
+  }
   lrm <- - param_path$DIV_save$fn_draws -
     param_path$DIV_save$lp_approx_draws
   return(lrm)
