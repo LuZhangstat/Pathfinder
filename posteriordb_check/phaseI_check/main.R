@@ -55,6 +55,9 @@ for(i in 41:49){ #20 length(model_record)
   init = lapply(initial_ls[[i]], f <- function(x){constrain_pars(posterior, x)})
   
   ###  run Stan with a long Phase I warmup time  ###
+  # need to run the following line to generate the stan file. no need to run if there is one. 
+  # write_stan_file(sc, dir = paste0(getwd(), "/modelcode"),
+  #                 basename = paste0(modelname, ".stan")) 
   file <- file.path(getwd(), "modelcode", paste0(modelname, ".stan"))
   mod <- cmdstan_model(file)
   
