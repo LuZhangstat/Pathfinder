@@ -10,6 +10,7 @@ library(posteriordb)
 library(posterior)
 library(ggplot2)
 library(cmdstanr)
+set_cmdstan_path("/home/luzhang/Google Drive/Github/adaptation/cmdstan-lowrank_robust")
 library(loo)
 source("../utils/sim_pf.R")
 source("../utils/lp_utils.R")
@@ -61,6 +62,9 @@ for(i in 1:length(model_record)){
       "benchmark lp_ mean:", round(lp_mean[i], digits = 3), "\n")
   
   ###  run ADVI through cmdstanr  ###
+  # need to run the following line to generate the stan file. no need to run if there is one. 
+  # write_stan_file(sc, dir = paste0(getwd(), "/modelcode"),
+  #                 basename = paste0(modelname, ".stan"))
   file <- file.path(getwd(), "modelcode", paste0(modelname, ".stan"))
   mod <- cmdstan_model(file)
   
@@ -159,7 +163,7 @@ ADVI_fullrank_lrs_100 <- list()
 iter_fit_full <- array(data = 0, dim = c(M, length(model_record)))
 calls_lp_full <- array(data = 0, dim = c(M, length(model_record)))
 calls_gr_full <- array(data = 0, dim = c(M, length(model_record)))
-for(i in 1:length(model_record)){
+for(i in 21:length(model_record)){
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   # pick model
@@ -260,6 +264,9 @@ for(i in 1:length(model_record)){
                         as.numeric(strsplit(splited_output[[eta_ind]], split = "]")[[1]]))
         calls_lp_full[j, i] <- calls_lp_full[j, i] + 100 * min(eta_i+2, 6)
         calls_gr_full[j, i] <- calls_gr_full[j, i] + 50 * min(eta_i+1, 5)
+      }else if(output_print[L_e] == "Exception: integrate_ode_rk45:  Failed to integrate to next output time (12) in less than max_num_steps steps (in '/tmp/RtmplArVzk/model-14b74639d7f67.stan', line 32, column 2 to line 35, column 42)"){
+        print("integrate_ode_rk45 error")
+        
       }else{
         print("other problems")
       }
@@ -268,7 +275,7 @@ for(i in 1:length(model_record)){
   }
 }
 
-save(file = "../results/ADVI_100.RData",
+save(file = "../results/ADVI_100_RVI.RData",
      list = c("ADVI_meanfield_draw", "ADVI_meanfield_center", 
               "ADVI_meanfield_draw_100", "ADVI_meanfield_lrs_100",
               "ADVI_fullrank_draw", "ADVI_fullrank_draw_100",
