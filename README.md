@@ -7,8 +7,8 @@ Roadmap
 |Folder Name |     Intro            |
 |:------ |:----------- |
 |posteriordb| Subfolder posterior_database contains the database of package posteriordb|
-|posteriordb_check| Codes for experiments before Section 3.6|
-|example| Codes and data for Birthday example in Section 3.6 |
+|posteriordb_check| Codes for experiments for examples from posteriordb |
+|example| Codes and data for the Birthday example and other examples |
 |utils| Utility functions |
 
 
@@ -16,7 +16,7 @@ Instructions
 ---------
 (note: since the function **pdb_local()** requires folder posteriordb to be in a git repository, please use **git clone** to download the repository or configure a remote in the unzipped repository)
 
-#### HMC vs L-BFGS exam in Introduction:
+#### HMC vs L-BFGS exam in Introduction (old test, no longer in the paper):
 1. Optimization: posteriordb_check/phaseI_check/check_LBFGS.R
 2. Stan phase I: posteriordb_check/phaseI_check/main.R
 3. Plots: posteriordb_check/pic.R
@@ -26,7 +26,7 @@ Instructions
 ##### 100 repeats for experiments in Section 3
 1. Stan phase I: posteriordb_check/phaseI_check/main_100_PhI.R
 2. Pathfinder: posteriordb_check/phaseI_adapt_check/main_pf.R
-3. ADVI: posteriordb_check/phaseI_ADVI/main_ADVI_100.R
+3. Robust ADVI: posteriordb_check/phaseI_ADVI/main_RVI_100.R
 ##### Wasserstein distance computation and Plots for all experiements
 4. Wasserstein distance: posteriordb_check/wasserstain_check.R
 5. Plots: posteriordb_check/pic.R
