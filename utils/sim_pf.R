@@ -134,7 +134,7 @@ opt_path <- function(init, fn, gr,
   Ykt_h <- NULL; Skt_h <- NULL # initialize matrics for storing history of updates
   t <- proc.time()
   for (iter in 1:Iter){
-    #cat(iter, "\t")
+    cat(iter, "\t")
     inc_flag <- check_cond(Ykt[iter, ], Skt[iter, ])
     if(inc_flag){
       E <- Form_init_Diag(E, Ykt[iter, ], Skt[iter, ]) # initial estimate of diagonal inverse Hessian
@@ -144,7 +144,7 @@ opt_path <- function(init, fn, gr,
     ill_distr = FALSE
     tryCatch(
       # generate matrics for forming approximted inverse Hessian
-      sample_pkg <- Form_N_apx(X[iter + 1, ], Ykt_h, Skt_h, E, lmm),
+      sample_pkg <- Form_N_apx(X[iter + 1, ], G[iter + 1, ], Ykt_h, Skt_h, E, lmm),
       error = function(e) { ill_distr <<- TRUE})
     if(ill_distr){ next }
     if(is.na(sample_pkg[1])){ next }
@@ -393,12 +393,13 @@ updateYS <- function(Ykt_h, Ykt, lmm){
   return(Ykt_h)
 }
 
-Form_N_apx <- function(x_center, Ykt_h, Skt_h, E, lmm){
+Form_N_apx <- function(x_l, g_l, Ykt_h, Skt_h, E, lmm){
   
   #' Returns sampling metrics of the approximating Gaussian given the history
   #' of optimization trajectory 
   #' 
-  #' @param x_center The center of the approximating Gaussian
+  #' @param x_l      The point up to which the optimization path is used for approximation
+  #' @param g_l      The gradient at x_l
   #' @param Ykt_h    history of updates along optimization trajectory
   #' @param Skt_h    history of updates of gradients along optimization trajectory
   #' @param E        initial diagonal inverse Hessian
@@ -406,7 +407,7 @@ Form_N_apx <- function(x_center, Ykt_h, Skt_h, E, lmm){
   #' 
   #' @return 
   
-  D = length(x_center)
+  D = length(x_l)
   if(is.null(Ykt_h)){# cannot approximate Hessian
     return(NA)}
   
@@ -438,6 +439,8 @@ Form_N_apx <- function(x_center, Ykt_h, Skt_h, E, lmm){
     cholHk = chol(Hk)
     logdetcholHk = determinant(cholHk)$modulus
     
+    x_center = c(x_l - Hk %*% g_l) # consider the first term in normal approximation
+    
     sample_pkg <- list(label = "full", cholHk = cholHk, 
                        logdetcholHk = logdetcholHk,
                        x_center = x_center)
@@ -456,16 +459,24 @@ Form_N_apx <- function(x_center, Ykt_h, Skt_h, E, lmm){
     Rktilde = chol(Rkbar %*% Mkbar %*% t(Rkbar) + diag(nrow(Rkbar)))
     logdetcholHk = sum(log(diag(Rktilde))) + 0.5 * sum(log(E))
     
+    ninvRSTg = ninvRST %*% g_l
+    x_center = c(x_l -   # consider the first term in taylor expansion
+      (E*g_l + E*crossprod(Ykt_h, ninvRSTg) + 
+      crossprod(ninvRST, Ykt_h %*% (E*g_l))  + 
+      crossprod(ninvRST, 
+                (diag(Dk, nrow = m) + 
+                   tcrossprod(Ykt_h %*% diag(sqrt(E), nrow = D))) %*% 
+                  ninvRSTg)))
+    
     sample_pkg <- list(label = "sparse", theta_D = 1 / E,
                        Qk = Qk, Rktilde = Rktilde,
                        logdetcholHk = logdetcholHk,
                        Mkbar = Mkbar,
                        Wkbart = Wkbart,
-                       x_center = x_center) #inv_metric_est is returned for estimating mass matrix 
+                       x_center = x_center)
   }
   return(sample_pkg)
 }
-
 
 est_DIV <- function(sample_pkg, N_sam, fn, label = "ELBO"){
   
@@ -507,7 +518,8 @@ est_DIV <- function(sample_pkg, N_sam, fn, label = "ELBO"){
       next
     } else {
       fn_draws[draw_ind] <- f_test_DIV
-      lp_approx_draws[draw_ind] <- - sample_pkg$logdetcholHk - 0.5 * sum(u^2)
+      lp_approx_draws[draw_ind] <- - sample_pkg$logdetcholHk - 
+        0.5 * (sum(u^2) + D * log(2 * pi))
       repeat_draws[, draw_ind] <- u2
       draw_ind = draw_ind + 1
     }
@@ -573,7 +585,8 @@ Sam_N_apx <- function(sample_pkg, N_sam){
          (u - sample_pkg$Qk %*% u1)) + sample_pkg$x_center
   }
   
-  lp_apx_draws <- - sample_pkg$logdetcholHk - 0.5 * colSums(u^2)
+  lp_apx_draws <- - sample_pkg$logdetcholHk - 0.5 * colSums(u^2) - 
+    0.5 * D * log(2*pi)
   
   return(list(samples = u2, lp_apx_draws = lp_apx_draws))
 }
@@ -630,13 +643,54 @@ Imp_Resam_WOR <- function(param_path, n_inits, seed = 123){
   lrms <- lrms[finit_ind]
   
   ## compute the importance weight ##
-  sample_weights_psis <- suppressWarnings(weights(psis(lrms, r_eff = 1),
+  sample_weights_psis <- suppressWarnings(weights(psis(lrms, r_eff = NA),
                                                   log = FALSE))
   #sample_weights_IS <- exp(lrms - max(lrms))/sum(exp(lrms - max(lrms)))
   
   ## Importance resampling ##
   set.seed(seed)
   sample_ind <-sample.int(ncol(samples), size = n_inits, replace = FALSE, 
+                          prob = sample_weights_psis)
+  
+  return(samples[, sample_ind])
+}
+
+Imp_Resam_WR <- function(param_path, n_sam, seed = 123){
+  
+  #' PSIS-IR with replacement for multi-path Pathfinder 
+  #' Return n_sam samples
+  #'  
+  #' @param param_path output of function opt_path_stan_parallel()
+  #' @param n_sam    number of distinct samples
+  #' @param seed       random seed for importance resampling
+  
+  # remove one-path Pathfinder that returns mode
+  check <- sapply(param_path, f <- function(x){
+    work <- (x$status == "samples")
+    work
+  })
+  
+  filter_mode <- c(1:length(check))[check]
+  
+  param_path <- param_path[filter_mode]
+  
+  ## extract samples and log ratios ##
+  samples <- do.call("cbind", lapply(param_path, extract_samples))
+  lrms <- c(sapply(param_path, extract_log_ratio))
+  
+  ## take off samples with infinite log ratios
+  finit_ind <- is.finite(lrms)
+  samples <- samples[, finit_ind]
+  lrms <- lrms[finit_ind]
+  
+  ## compute the importance weight ##
+  sample_weights_psis <- suppressWarnings(weights(psis(lrms, r_eff = NA),
+                                                  log = FALSE))
+  #sample_weights_IS <- exp(lrms - max(lrms))/sum(exp(lrms - max(lrms)))
+  
+  ## Importance resampling ##
+  set.seed(seed)
+  sample_ind <-sample.int(ncol(samples), size = n_sam, replace = TRUE, 
                           prob = sample_weights_psis)
   
   return(samples[, sample_ind])
@@ -664,7 +718,7 @@ Imp_Resam_Each <- function(param_path, seed){
                         lrms <- lrms[finit_ind]
                         
                         psis_w <- suppressWarnings(
-                          weights(psis(lrms, r_eff = 1), log = FALSE))
+                          weights(psis(lrms, r_eff = NA), log = FALSE))
                         pick_ind <- sample(1:length(psis_w),
                                            replace = TRUE,
                                            size = 1, prob = psis_w)
@@ -694,7 +748,7 @@ random_sample_Each <- function(param_path, seed){
                         samples <- extract_samples(x)
                         #finit_ind <- which(is.finite(lrms))
                         #pick_ind <- sample(finit_ind, size = 1)
-                        pick_ind <- sample(ncol(samples), size = 1)
+                        pick_ind <- sample.int(ncol(samples), size = 1)
                         EX_est <- samples[, pick_ind]
                       }
                       return(EX_est)})
@@ -734,4 +788,169 @@ extract_log_ratio <- function(param_path){
     param_path$DIV_save$lp_approx_draws
   return(lrm)
 }
+
+
+filter_samples_resam <- function(param_path, n_inits, seed = 123){
+  
+  #' SIR with mixture Gaussian 
+  
+  # remove the failed Pathfinder
+  check <- sapply(param_path, f <- function(x){
+    work <- TRUE
+    tryCatch(
+      lps <- extract_lps(x), error = function(e) { work <<- FALSE})
+    work
+  })
+  filter_mode <- c(1:length(check))[check]
+  
+  param_path <- param_path[filter_mode]
+  
+  lps <- c(sapply(param_path, extract_lps))
+  samples <- lapply(param_path, extract_samples)
+  
+  J <- length(param_path)
+  ns <- ncol(samples[[1]])
+  lp_approx_M <- matrix(0, nrow = J*ns, ncol = J) # save log-densities 
+  
+  for(indI in 1:J){  #sample
+    for(indJ in 1:J){ #pathfinder
+      if (indJ == indI){
+        lp_approx_M[((indI-1)*ns + 1):(indI * ns), indJ] <- 
+          param_path[[indJ]]$DIV_save$lp_approx_draws
+      } else {
+        lps_tem <- rep(0, ns)
+        if(param_path[[indJ]]$sample_pkg_save$label == "full"){
+          u <- forwardsolve(param_path[[indJ]]$sample_pkg_save$cholHk,
+                            (samples[[indI]] -  
+                               param_path[[indJ]]$sample_pkg_save$x_center),
+                            transpose = TRUE, upper.tri = TRUE)
+          lps_tem = - param_path[[indJ]]$sample_pkg_save$logdetcholHk -
+            0.5 * colSums(u^2)
+        }else{
+          u1 <- (samples[[indI]] - param_path[[indJ]]$sample_pkg_save$x_center) * 
+            sqrt(param_path[[indJ]]$sample_pkg_save$theta_D)
+          u2 = crossprod(param_path[[indJ]]$sample_pkg_save$Qk, u1)
+          norm_u <- 
+            colSums(forwardsolve(param_path[[indJ]]$sample_pkg_save$Rktilde, u2,
+                                 transpose = TRUE, upper.tri = TRUE)^2) + 
+            colSums(u1^2) - colSums(u2^2)
+          lps_tem = - param_path[[indJ]]$sample_pkg_save$logdetcholHk -
+            0.5 * norm_u
+        }
+        lp_approx_M[((indI-1)*ns + 1):(indI * ns), indJ] <- lps_tem
+      }
+    }
+  }
+  
+  lp_approx <- apply(lp_approx_M, 1, logSumExp)
+  lrms <- lps - lp_approx
+  
+  sample_weights <- suppressWarnings(weights(psis(lrms, r_eff = NA), 
+                                             log = FALSE))
+  
+  samples_M <- matrix(unlist(samples), nrow = nrow(samples[[1]]))
+  
+  set.seed(seed)
+  sample_ind <- sample(1:length(sample_weights), replace = TRUE,
+                       size = n_inits, prob = sample_weights)
+  print(table(sample_ind))
+  return(samples_M[, sample_ind])
+}
+
+
+get_opt_tr <- function(opath){
+  
+  ###
+  #' function for retreveing optimization trajectories
+  #' 
+  
+  lp_ind = ncol(opath[[1]]$y)
+  opt_tr <- c()
+  ind_tr <- c()
+  tr_id <- c()
+  for(l in 1:length(opath)){
+    opt_tr = rbind(opt_tr, opath[[l]]$y[, 1:(lp_ind - 1)])
+    ind_tr = c(ind_tr, 
+               1:nrow(opath[[l]]$y[, 1:(lp_ind - 1)]))
+    tr_id = c(tr_id, 
+              rep(l, nrow(opath[[l]]$y[, 1:(lp_ind - 1)])))
+    
+  }
+  return(list(opt_tr = opt_tr, ind_tr = ind_tr, tr_id = tr_id))
+}
+
+
+# old function #
+#' Form_N_apx <- function(x_center, Ykt_h, Skt_h, E, lmm){
+#'   
+#'   #' Returns sampling metrics of the approximating Gaussian given the history
+#'   #' of optimization trajectory 
+#'   #' 
+#'   #' @param x_center The center of the approximating Gaussian
+#'   #' @param Ykt_h    history of updates along optimization trajectory
+#'   #' @param Skt_h    history of updates of gradients along optimization trajectory
+#'   #' @param E        initial diagonal inverse Hessian
+#'   #' @param lmm      The size of history
+#'   #' 
+#'   #' @return 
+#'   
+#'   D = length(x_center)
+#'   if(is.null(Ykt_h)){# cannot approximate Hessian
+#'     return(NA)}
+#'   
+#'   Dk = c()
+#'   thetak = c()
+#'   m = nrow(Ykt_h)
+#'   for(i in 1:m){
+#'     Dk[i] = sum(Ykt_h[i, ] * Skt_h[i, ])
+#'     thetak[i] = sum(Ykt_h[i, ]^2) / Dk[i]   # curvature checking
+#'   }
+#'   
+#'   Rk = matrix(0.0, nrow = m, ncol = m)
+#'   for(s in 1:m){
+#'     for(i in 1:s){
+#'       Rk[i, s] = sum(Skt_h[i, ] * Ykt_h[s, ])
+#'     }
+#'   }
+#'   ninvRST = -backsolve(Rk, Skt_h)
+#'   
+#'   if( 2*m >= D){
+#'     # directly calculate inverse Hessian and the cholesky decomposition
+#'     Hk = diag(E, nrow = D) + 
+#'       crossprod(Ykt_h %*% diag(E, nrow = D), ninvRST) + 
+#'       crossprod(ninvRST, Ykt_h %*% diag(E, nrow = D))  + 
+#'       crossprod(ninvRST, 
+#'                 (diag(Dk, nrow = m) + 
+#'                    tcrossprod(Ykt_h %*% diag(sqrt(E), nrow = D))) %*% 
+#'                   ninvRST)
+#'     cholHk = chol(Hk)
+#'     logdetcholHk = determinant(cholHk)$modulus
+#'     
+#'     sample_pkg <- list(label = "full", cholHk = cholHk, 
+#'                        logdetcholHk = logdetcholHk,
+#'                        x_center = x_center)
+#'     
+#'   } else {
+#'     # use equation ?? to sample
+#'     Wkbart = rbind(Ykt_h %*% diag(sqrt(E)),
+#'                    ninvRST %*% diag(sqrt(1 / E)))
+#'     Mkbar = rbind(cbind(matrix(0.0, nrow = m, ncol = m), diag(m)),
+#'                   cbind(diag(m),
+#'                         (diag(Dk, nrow = m) +
+#'                            tcrossprod(Ykt_h %*% diag(sqrt(E))))))
+#'     qrW = qr(t(Wkbart))
+#'     Qk = qr.Q(qrW)
+#'     Rkbar = qr.R(qrW)
+#'     Rktilde = chol(Rkbar %*% Mkbar %*% t(Rkbar) + diag(nrow(Rkbar)))
+#'     logdetcholHk = sum(log(diag(Rktilde))) + 0.5 * sum(log(E))
+#'     
+#'     sample_pkg <- list(label = "sparse", theta_D = 1 / E,
+#'                        Qk = Qk, Rktilde = Rktilde,
+#'                        logdetcholHk = logdetcholHk,
+#'                        Mkbar = Mkbar,
+#'                        Wkbart = Wkbart,
+#'                        x_center = x_center) #inv_metric_est is returned for estimating mass matrix 
+#'   }
+#'   return(sample_pkg)
+#' }
 
