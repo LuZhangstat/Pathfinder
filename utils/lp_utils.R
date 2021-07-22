@@ -374,29 +374,30 @@ lp_explore <- function(fit, INV, L, M, model, data){
   return(list(n_iters = n_iters, n_sum_leapfrog = n_sum_leapfrog))
 }
 
-## function for extract optims and inits ##
-get_init_optim <- function(ind){
-  
-  # remove the failed Pathfinder
-  param_path <- lp_opath[[ind]]$opath
-  check <- sapply(param_path, f <- function(x){
-    work <- TRUE
-    tryCatch(
-      lps <- extract_lps(x), error = function(e) { work <<- FALSE})
-    work
-  })
-  filter_mode <- c(1:length(check))[check]
-  
-  param_path <- param_path[filter_mode]
-  
-  lp_ind = ncol(param_path[[1]]$y)
-  inits <- c()
-  optims <- c()
-  for(l in 1:length(param_path)){
-    inits = rbind(inits, param_path[[l]]$y[1, 1:(lp_ind - 1)])
-    last_ind <- nrow(param_path[[l]]$y)
-    optims = rbind(optims, 
-                   param_path[[l]]$y[last_ind, 1:(lp_ind - 1)])
-  }
-  return(list(inits = inits, optims = optims))
-}
+# old code #
+# ## function for extract optims and inits ##
+# get_init_optim <- function(ind){
+#   
+#   # remove the failed Pathfinder
+#   param_path <- lp_opath[[ind]]$opath
+#   check <- sapply(param_path, f <- function(x){
+#     work <- TRUE
+#     tryCatch(
+#       lps <- extract_lps(x), error = function(e) { work <<- FALSE})
+#     work
+#   })
+#   filter_mode <- c(1:length(check))[check]
+#   
+#   param_path <- param_path[filter_mode]
+#   
+#   lp_ind = ncol(param_path[[1]]$y)
+#   inits <- c()
+#   optims <- c()
+#   for(l in 1:length(param_path)){
+#     inits = rbind(inits, param_path[[l]]$y[1, 1:(lp_ind - 1)])
+#     last_ind <- nrow(param_path[[l]]$y)
+#     optims = rbind(optims, 
+#                    param_path[[l]]$y[last_ind, 1:(lp_ind - 1)])
+#   }
+#   return(list(inits = inits, optims = optims))
+# }
