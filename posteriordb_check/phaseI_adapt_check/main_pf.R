@@ -88,12 +88,13 @@ for(i in 1:49){ #length(model_record)
   # opath <- lp_opath[[i]]$opath
   
   pick_samples <- random_sample_Each(opath, seed = 1) # randomly pick one approximating draws for each run of Pathfinder
+  
+  # code for generating multi-path pathfinder results for case studies in section 3.4
   # need to run pathfinder with eval_lp_draws = TRUE
   # opath <- opt_path_stan_parallel(seed_list, seed_list, mc.cores, model, data,
   #                                 init_bound = init_bound, N1, N_sam_DIV, N_sam,
   #                                 factr_tol, lmm, eval_lp_draws = TRUE)
-  # pick_samples <- Imp_Resam_Each(opath, seed = 1)   # use PSIS-IR to pick one approximating draws for each run of Pathfinder (no longer used in the paper)
-  # pick_samples <- Imp_Resam_WOR(opath, n_inits = 20, seed = 1) # use PSIS-IR to pick n_inits distinct approximating draws for multi-path Pathfinder
+  # pick_samples <- Imp_Resam_WR(opath, n_sam = 100, seed = 1) # use PSIS-IR to pick n_inits distinct approximating draws for multi-path Pathfinder
 
   lp_opath[[i]] <- list(opath = opath, pick_samples = pick_samples)
   
@@ -101,7 +102,7 @@ for(i in 1:49){ #length(model_record)
 proc.time() - t_0
 
 
-#save(file = "../results/lp_posteriordb_phI_adapt_long_hist.RData",
+# save(file = "../results/lp_posteriordb_phI_adapt_long_hist.RData",
 #    list = c("lp_opath"))
 # _default
 # _short_L
@@ -160,7 +161,7 @@ for(i in 1:49){ #length(model_record)
     opath <- opt_path_stan_parallel(seed_list, seed_list, mc.cores, model, data,
                                     init_bound = init_bound, N1, N_sam_DIV, N_sam, 
                                     factr_tol, lmm)
-    pick_samples <- Imp_Resam_WOR(opath, n_inits = N_sam, seed = 1)
+    pick_samples <- Imp_Resam_WR(opath, n_sam = N_sam, seed = 1)
     
     lp_multi_opath[[i]][[j]] <- list(opath = opath, pick_samples = pick_samples)
     
@@ -171,7 +172,7 @@ for(i in 1:49){ #length(model_record)
 }
 proc.time() - t_0
 
-save(file = "../results/multi_pf_samples_I20.RData",
+save(file = "../results/multi_pf_samples_I40.RData",
      list = c("lp_multi_opath"))
 
 #_default
@@ -179,37 +180,37 @@ save(file = "../results/multi_pf_samples_I20.RData",
 #_I40   # 69436.82s
 
 ############### old code #######################
-# random sample 4 pathfinder + SIR WOR #
-load(file = "../results/lp_posteriordb_LBFGS_h6.RData")
-load("../results/lp_posteriordb_phI_adapt_large_K.RData")
-set.seed(123)
-
-pf_SIR_WOR_4_draws <- list()
-pf_4_each <- list()
-
-which(model_record == 48)
-t_0 <- proc.time()
-for(i in 1:49){ #length(model_record)
-  modelname <- pn[model_record[i]]
-  printf("model %d: %s", model_record[i], modelname)
-  
-  # pick model
-  
-  pf_SIR_WOR_4_draws[[i]] <- list()
-  pf_4_each[[i]] <- list()
-  for(j in 1:25){
-    pf_4_each[[i]][[j]] <- lp_opath[[i]]$
-      pick_samples[, (((j - 1) * 4 + 1):(j * 4))]
-    set.seed(j)
-    pf_SIR_WOR_4_draws[[i]][[j]] <- 
-      Imp_Resam_WOR(lp_opath[[i]]$opath[((j - 1) * 4 + 1):(j * 4)],
-                    n_inits = 4, seed = j)
-    
-  }
-}
-proc.time() - t_0
-
-save(file = "../results/pf_SIR_WOR_4_draws_large_K.RData",
-     list = c("pf_SIR_WOR_4_draws", "pf_4_each"))
-  
+## random sample 4 pathfinder + SIR WOR #
+# load(file = "../results/lp_posteriordb_LBFGS_h6.RData")
+# load("../results/lp_posteriordb_phI_adapt_large_K.RData")
+# set.seed(123)
+# 
+# pf_SIR_WOR_4_draws <- list()
+# pf_4_each <- list()
+# 
+# which(model_record == 48)
+# t_0 <- proc.time()
+# for(i in 1:49){ #length(model_record)
+#   modelname <- pn[model_record[i]]
+#   printf("model %d: %s", model_record[i], modelname)
+#   
+#   # pick model
+#   
+#   pf_SIR_WOR_4_draws[[i]] <- list()
+#   pf_4_each[[i]] <- list()
+#   for(j in 1:25){
+#     pf_4_each[[i]][[j]] <- lp_opath[[i]]$
+#       pick_samples[, (((j - 1) * 4 + 1):(j * 4))]
+#     set.seed(j)
+#     pf_SIR_WOR_4_draws[[i]][[j]] <- 
+#       Imp_Resam_WOR(lp_opath[[i]]$opath[((j - 1) * 4 + 1):(j * 4)],
+#                     n_inits = 4, seed = j)
+#     
+#   }
+# }
+# proc.time() - t_0
+# 
+# save(file = "../results/pf_SIR_WOR_4_draws_large_K.RData",
+#      list = c("pf_SIR_WOR_4_draws", "pf_4_each"))
+#   
   
