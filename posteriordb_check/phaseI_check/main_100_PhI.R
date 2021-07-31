@@ -98,32 +98,32 @@ load("../results/PhI_100_h10.RData")
 length(PhaseI_last_draw)
 
 
-## old code ##
-# 10 random samples #
-MC = 100
-load("../results/PhI_100_h10.RData")
-set.seed(123)
-
-phI_10_draws <- list()
-
-which(model_record == 48)
-t_0 <- proc.time()
-for(i in 1:49){ #length(model_record)
-  modelname <- pn[model_record[i]]
-  printf("model %d: %s", model_record[i], modelname)
-  
-  # pick model
-  
-  phI_10_draws[[i]] <- list()
-  for(j in 1:MC){
-    set.seed(j)
-    pick_pf <- sample.int(MC, 10, replace = FALSE)
-    phI_10_draws[[i]][[j]] <- PhaseI_last_draw[[i]][pick_pf, ]
-  }
-}
-proc.time() - t_0
-
-save(file = "../results/phI_10_draws.RData",
-     list = c("phI_10_draws"))
+# ## old code ##
+# # 10 random samples #
+# MC = 100
+# load("../results/PhI_100_h10.RData")
+# set.seed(123)
+# 
+# phI_10_draws <- list()
+# 
+# which(model_record == 48)
+# t_0 <- proc.time()
+# for(i in 1:49){ #length(model_record)
+#   modelname <- pn[model_record[i]]
+#   printf("model %d: %s", model_record[i], modelname)
+#   
+#   # pick model
+#   
+#   phI_10_draws[[i]] <- list()
+#   for(j in 1:MC){
+#     set.seed(j)
+#     pick_pf <- sample.int(MC, 10, replace = FALSE)
+#     phI_10_draws[[i]][[j]] <- PhaseI_last_draw[[i]][pick_pf, ]
+#   }
+# }
+# proc.time() - t_0
+# 
+# save(file = "../results/phI_10_draws.RData",
+#      list = c("phI_10_draws"))
 
 
