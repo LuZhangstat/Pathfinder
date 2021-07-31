@@ -73,7 +73,7 @@ fit_pf_flag <- FALSE
 if(fit_pf_flag){
   mc.cores = parallel::detectCores() - 2
   ## tuning parameters
-  init_bound = 2.0 # parameter for initial distribution 
+  init_bound = 10.0 # parameter for initial distribution 
   N1 = 1000    # maximum iters in optimization
   factr_tol = 1e2 # relative tolerance = 1-4 is not enough, should use at least 1e7
   N_sam_DIV = 5   # samples for ELBO evaluation
@@ -87,14 +87,14 @@ if(fit_pf_flag){
   t <- proc.time()
   opath <- opt_path_stan_parallel(seed_list, seed_list, mc.cores, model, data = NULL,
                                   init_bound = init_bound, N1, N_sam_DIV, N_sam, 
-                                  factr_tol, lmm) # plot for 8school init_bound = 15
+                                  factr_tol, lmm) # plot for init_bound = 15
   print(proc.time() - t)
   
   pick_samples_IR <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
   pick_samples <- pick_samples_IR
   pf_fn_calls <- sapply(opath, f <- function(x){x$fn_call})
   pf_gr_calls <- sapply(opath, f <- function(x){x$gr_call})
-  save(file = "../example/funnel100/opath.RData",
+  save(file = "../example/funnel100/opath.RData", #_int10
        list = c("opath", "pick_samples", "pf_fn_calls", "pf_gr_calls"))
 }else{
   load("../example/funnel100/opath.RData")
@@ -125,28 +125,6 @@ for(first_check in 6:10){
   readline(prompt="Press [enter] to continue:")
 }
 
-get_opt_tr <- function(opath){
-  
-  ###
-  #' function for retreveing optimization trajectories
-  #' 
-  
-  lp_ind = ncol(opath[[1]]$y)
-  opt_tr <- c()
-  ind_tr <- c()
-  tr_id <- c()
-  for(l in 1:length(opath)){
-    opt_tr = rbind(opt_tr, opath[[l]]$y[, 1:(lp_ind - 1)])
-    ind_tr = c(ind_tr, 
-               1:nrow(opath[[l]]$y[, 1:(lp_ind - 1)]))
-    tr_id = c(tr_id, 
-              rep(l, nrow(opath[[l]]$y[, 1:(lp_ind - 1)])))
-    
-  }
-  return(list(opt_tr = opt_tr, ind_tr = ind_tr, tr_id = tr_id))
-}
-
-
 opt_tr_res <- get_opt_tr(opath)#opath #lp_opath[[15]]$opath
 check_dim <- c(2, 1)
 
@@ -176,7 +154,7 @@ p_check <- ggplot(dta_check, aes(x=x, y=y) ) +
   )
 
 p_check
-ggsave("funnel100_points.eps", #"8-school_opt_tr22.eps"
+ggsave("funnel100_points.eps", #"funnel100_points22.eps"
        plot = p_check,
        device = cairo_ps,
        path = "../pics/phI_adapt_default/",
@@ -200,7 +178,7 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   ) 
 p_check1
 
-ggsave("funnel100_tr.eps", #"8-school_opt_tr22.eps"
+ggsave("funnel100_tr.eps", #"funnel100_tr22.eps"
        plot = p_check1,
        device = cairo_ps,
        path = "../pics/phI_adapt_default/",
@@ -208,30 +186,30 @@ ggsave("funnel100_tr.eps", #"8-school_opt_tr22.eps"
 
 
 
-plot(unconstrained_draws[, check_dim[1]], unconstrained_draws[, check_dim[2]], 
-     col = "grey", 
-     xlim = range(unconstrained_draws[, check_dim[1]],
-                  pick_samples[check_dim[1], ]),
-     ylim = range(unconstrained_draws[, check_dim[2]],
-                  pick_samples[check_dim[2], ]),
-     main = paste0("element ", check_dim[1], " and ", check_dim[2]),
-     xlab = colnames(unconstrained_draws)[check_dim[1]], 
-     ylab = colnames(unconstrained_draws)[check_dim[2]])
+# plot(unconstrained_draws[, check_dim[1]], unconstrained_draws[, check_dim[2]], 
+#      col = "grey", 
+#      xlim = range(unconstrained_draws[, check_dim[1]],
+#                   pick_samples[check_dim[1], ]),
+#      ylim = range(unconstrained_draws[, check_dim[2]],
+#                   pick_samples[check_dim[2], ]),
+#      main = paste0("element ", check_dim[1], " and ", check_dim[2]),
+#      xlab = colnames(unconstrained_draws)[check_dim[1]], 
+#      ylab = colnames(unconstrained_draws)[check_dim[2]])
+# 
+# points(x = pick_samples[check_dim[1], ], y = pick_samples[check_dim[2], ], 
+#        col = "orange", pch = 16)
 
-points(x = pick_samples[check_dim[1], ], y = pick_samples[check_dim[2], ], 
-       col = "orange", pch = 16)
-
-## for fun ##
-init_ls <- list()
-for (s in 1:length(seed_list)){
-  init_ls[[s]] <- opath[[s]]$y[1, 1:D] + 10
-}
-t <- proc.time()
-opath <- opt_path_stan_init_parallel(
-  init_ls, mc.cores, model, data = NULL, init_bound = 2.0, 
-  N1, N_sam_DIV, N_sam, factr_tol, lmm, seed_list)
-print(proc.time() - t)
-opath <- opath[-c(7, 13, 14)]
-pick_samples <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
+# ## for fun ##
+# init_ls <- list()
+# for (s in 1:length(seed_list)){
+#   init_ls[[s]] <- opath[[s]]$y[1, 1:D] + 10
+# }
+# t <- proc.time()
+# opath <- opt_path_stan_init_parallel(
+#   init_ls, mc.cores, model, data = NULL, init_bound = 2.0, 
+#   N1, N_sam_DIV, N_sam, factr_tol, lmm, seed_list)
+# print(proc.time() - t)
+# opath <- opath[-c(7, 13, 14)]
+# pick_samples <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
 
 
