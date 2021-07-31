@@ -134,7 +134,7 @@ opt_path <- function(init, fn, gr,
   Ykt_h <- NULL; Skt_h <- NULL # initialize matrics for storing history of updates
   t <- proc.time()
   for (iter in 1:Iter){
-    cat(iter, "\t")
+    #cat(iter, "\t")
     inc_flag <- check_cond(Ykt[iter, ], Skt[iter, ])
     if(inc_flag){
       E <- Form_init_Diag(E, Ykt[iter, ], Skt[iter, ]) # initial estimate of diagonal inverse Hessian
@@ -144,7 +144,8 @@ opt_path <- function(init, fn, gr,
     ill_distr = FALSE
     tryCatch(
       # generate matrics for forming approximted inverse Hessian
-      sample_pkg <- Form_N_apx(X[iter + 1, ], G[iter + 1, ], Ykt_h, Skt_h, E, lmm),
+      sample_pkg <- Form_N_apx_taylor(X[iter + 1, ], G[iter + 1, ], Ykt_h, Skt_h, E, lmm),
+      #sample_pkg <- Form_N_apx(X[iter + 1, ], Ykt_h, Skt_h, E, lmm),
       error = function(e) { ill_distr <<- TRUE})
     if(ill_distr){ next }
     if(is.na(sample_pkg[1])){ next }
@@ -159,11 +160,11 @@ opt_path <- function(init, fn, gr,
     }
   } 
   proc.time() -t 
-  #plot(1:length(DIV_ls), DIV_ls, ylim = c(-2000, 200))
+  #plot(1:length(DIV_ls), DIV_ls, ylim = c(-15000, 2000))
   sample_pkg_save <- sample_pkg_pick
   DIV_save <- DIV_fit_pick
   
-  if(is.null(DIV_ls)){ # if no normal approximation generated, return the set of parameters found by optim
+  if(is.null(DIV_ls) | (max(DIV_ls) == -Inf)){ # if no normal approximation generated, return the set of parameters found by optim
     return(list(sample_pkg_save = sample_pkg_save, # matrics for estiamted inv Hessian 
                 DIV_save = DIV_save,               # approximating draws and DIV
                 y = y,                             # optimization path
@@ -242,8 +243,10 @@ opt_path_stan <- function(model, data, init_bound = 2, N1 = 1000,
   out <- opt_path(init, fn = fn, gr = gr, N1 = N1, N_sam_DIV = N_sam_DIV,
                   N_sam = N_sam, factr_tol = factr_tol,
                   lmm = lmm, seed = seed, eval_lp_draws = eval_lp_draws)
+  #seed = seed + 1
   return(out)
 }
+
 
 opt_path_stan_parallel <- function(seed_init, seed_list, mc.cores, model, data, 
                                    init_bound = 2.0, N1 = 1000, 
@@ -393,24 +396,24 @@ updateYS <- function(Ykt_h, Ykt, lmm){
   return(Ykt_h)
 }
 
-Form_N_apx <- function(x_l, g_l, Ykt_h, Skt_h, E, lmm){
-  
+Form_N_apx_taylor <- function(x_l, g_l, Ykt_h, Skt_h, E, lmm){
+
   #' Returns sampling metrics of the approximating Gaussian given the history
-  #' of optimization trajectory 
-  #' 
+  #' of optimization trajectory
+  #'
   #' @param x_l      The point up to which the optimization path is used for approximation
   #' @param g_l      The gradient at x_l
   #' @param Ykt_h    history of updates along optimization trajectory
   #' @param Skt_h    history of updates of gradients along optimization trajectory
   #' @param E        initial diagonal inverse Hessian
   #' @param lmm      The size of history
-  #' 
-  #' @return 
-  
+  #'
+  #' @return
+
   D = length(x_l)
   if(is.null(Ykt_h)){# cannot approximate Hessian
     return(NA)}
-  
+
   Dk = c()
   thetak = c()
   m = nrow(Ykt_h)
@@ -418,7 +421,7 @@ Form_N_apx <- function(x_l, g_l, Ykt_h, Skt_h, E, lmm){
     Dk[i] = sum(Ykt_h[i, ] * Skt_h[i, ])
     thetak[i] = sum(Ykt_h[i, ]^2) / Dk[i]   # curvature checking
   }
-  
+
   Rk = matrix(0.0, nrow = m, ncol = m)
   for(s in 1:m){
     for(i in 1:s){
@@ -426,25 +429,25 @@ Form_N_apx <- function(x_l, g_l, Ykt_h, Skt_h, E, lmm){
     }
   }
   ninvRST = -backsolve(Rk, Skt_h)
-  
+
   if( 2*m >= D){
     # directly calculate inverse Hessian and the cholesky decomposition
-    Hk = diag(E, nrow = D) + 
-      crossprod(Ykt_h %*% diag(E, nrow = D), ninvRST) + 
-      crossprod(ninvRST, Ykt_h %*% diag(E, nrow = D))  + 
-      crossprod(ninvRST, 
-                (diag(Dk, nrow = m) + 
-                   tcrossprod(Ykt_h %*% diag(sqrt(E), nrow = D))) %*% 
+    Hk = diag(E, nrow = D) +
+      crossprod(Ykt_h %*% diag(E, nrow = D), ninvRST) +
+      crossprod(ninvRST, Ykt_h %*% diag(E, nrow = D))  +
+      crossprod(ninvRST,
+                (diag(Dk, nrow = m) +
+                   tcrossprod(Ykt_h %*% diag(sqrt(E), nrow = D))) %*%
                   ninvRST)
     cholHk = chol(Hk)
     logdetcholHk = determinant(cholHk)$modulus
-    
+
     x_center = c(x_l - Hk %*% g_l) # consider the first term in normal approximation
-    
-    sample_pkg <- list(label = "full", cholHk = cholHk, 
+
+    sample_pkg <- list(label = "full", cholHk = cholHk,
                        logdetcholHk = logdetcholHk,
                        x_center = x_center)
-    
+
   } else {
     # use equation ?? to sample
     Wkbart = rbind(Ykt_h %*% diag(sqrt(E)),
@@ -458,16 +461,16 @@ Form_N_apx <- function(x_l, g_l, Ykt_h, Skt_h, E, lmm){
     Rkbar = qr.R(qrW)
     Rktilde = chol(Rkbar %*% Mkbar %*% t(Rkbar) + diag(nrow(Rkbar)))
     logdetcholHk = sum(log(diag(Rktilde))) + 0.5 * sum(log(E))
-    
+
     ninvRSTg = ninvRST %*% g_l
     x_center = c(x_l -   # consider the first term in taylor expansion
-      (E*g_l + E*crossprod(Ykt_h, ninvRSTg) + 
-      crossprod(ninvRST, Ykt_h %*% (E*g_l))  + 
-      crossprod(ninvRST, 
-                (diag(Dk, nrow = m) + 
-                   tcrossprod(Ykt_h %*% diag(sqrt(E), nrow = D))) %*% 
+      (E*g_l + E*crossprod(Ykt_h, ninvRSTg) +
+      crossprod(ninvRST, Ykt_h %*% (E*g_l))  +
+      crossprod(ninvRST,
+                (diag(Dk, nrow = m) +
+                   tcrossprod(Ykt_h %*% diag(sqrt(E), nrow = D))) %*%
                   ninvRSTg)))
-    
+
     sample_pkg <- list(label = "sparse", theta_D = 1 / E,
                        Qk = Qk, Rktilde = Rktilde,
                        logdetcholHk = logdetcholHk,
@@ -501,13 +504,13 @@ est_DIV <- function(sample_pkg, N_sam, fn, label = "ELBO"){
   for(l in 1:(2*N_sam)){
     if(sample_pkg$label == "full"){
       u = rnorm(D)
-      u2 = crossprod(sample_pkg$cholHk, u) + sample_pkg$x_center
+      u2 = crossprod(sample_pkg$cholHk, u) + c(sample_pkg$x_center)
     }else{
       u = rnorm(D)
       u1 = crossprod(sample_pkg$Qk, u)
       u2 = diag(sqrt(1 / sample_pkg$theta_D)) %*%
         (sample_pkg$Qk %*% crossprod(sample_pkg$Rktilde, u1) + 
-           (u - sample_pkg$Qk %*% u1)) + sample_pkg$x_center
+           (u - sample_pkg$Qk %*% u1)) + c(sample_pkg$x_center)
     }
     # skip bad samples
     skip_flag = FALSE
@@ -518,8 +521,8 @@ est_DIV <- function(sample_pkg, N_sam, fn, label = "ELBO"){
       next
     } else {
       fn_draws[draw_ind] <- f_test_DIV
-      lp_approx_draws[draw_ind] <- - sample_pkg$logdetcholHk - 
-        0.5 * (sum(u^2) + D * log(2 * pi))
+      lp_approx_draws[draw_ind] <- - sample_pkg$logdetcholHk - 0.5 * sum(u^2) - 
+        0.5 * D * log(2 * pi)
       repeat_draws[, draw_ind] <- u2
       draw_ind = draw_ind + 1
     }
@@ -576,13 +579,13 @@ Sam_N_apx <- function(sample_pkg, N_sam){
   
   if(sample_pkg$label == "full"){
     u = matrix(rnorm(D * N_sam), nrow = D)
-    u2 = crossprod(sample_pkg$cholHk, u) + sample_pkg$x_center
+    u2 = crossprod(sample_pkg$cholHk, u) + c(sample_pkg$x_center)
   }else{
     u = matrix(rnorm(D * N_sam), nrow = D)
     u1 = crossprod(sample_pkg$Qk, u)
     u2 = diag(sqrt(1 / sample_pkg$theta_D)) %*%
       (sample_pkg$Qk %*% crossprod(sample_pkg$Rktilde, u1) + 
-         (u - sample_pkg$Qk %*% u1)) + sample_pkg$x_center
+         (u - sample_pkg$Qk %*% u1)) + c(sample_pkg$x_center)
   }
   
   lp_apx_draws <- - sample_pkg$logdetcholHk - 0.5 * colSums(u^2) - 
@@ -880,77 +883,76 @@ get_opt_tr <- function(opath){
 }
 
 
-# old function #
-#' Form_N_apx <- function(x_center, Ykt_h, Skt_h, E, lmm){
-#'   
-#'   #' Returns sampling metrics of the approximating Gaussian given the history
-#'   #' of optimization trajectory 
-#'   #' 
-#'   #' @param x_center The center of the approximating Gaussian
-#'   #' @param Ykt_h    history of updates along optimization trajectory
-#'   #' @param Skt_h    history of updates of gradients along optimization trajectory
-#'   #' @param E        initial diagonal inverse Hessian
-#'   #' @param lmm      The size of history
-#'   #' 
-#'   #' @return 
-#'   
-#'   D = length(x_center)
-#'   if(is.null(Ykt_h)){# cannot approximate Hessian
-#'     return(NA)}
-#'   
-#'   Dk = c()
-#'   thetak = c()
-#'   m = nrow(Ykt_h)
-#'   for(i in 1:m){
-#'     Dk[i] = sum(Ykt_h[i, ] * Skt_h[i, ])
-#'     thetak[i] = sum(Ykt_h[i, ]^2) / Dk[i]   # curvature checking
-#'   }
-#'   
-#'   Rk = matrix(0.0, nrow = m, ncol = m)
-#'   for(s in 1:m){
-#'     for(i in 1:s){
-#'       Rk[i, s] = sum(Skt_h[i, ] * Ykt_h[s, ])
-#'     }
-#'   }
-#'   ninvRST = -backsolve(Rk, Skt_h)
-#'   
-#'   if( 2*m >= D){
-#'     # directly calculate inverse Hessian and the cholesky decomposition
-#'     Hk = diag(E, nrow = D) + 
-#'       crossprod(Ykt_h %*% diag(E, nrow = D), ninvRST) + 
-#'       crossprod(ninvRST, Ykt_h %*% diag(E, nrow = D))  + 
-#'       crossprod(ninvRST, 
-#'                 (diag(Dk, nrow = m) + 
-#'                    tcrossprod(Ykt_h %*% diag(sqrt(E), nrow = D))) %*% 
-#'                   ninvRST)
-#'     cholHk = chol(Hk)
-#'     logdetcholHk = determinant(cholHk)$modulus
-#'     
-#'     sample_pkg <- list(label = "full", cholHk = cholHk, 
-#'                        logdetcholHk = logdetcholHk,
-#'                        x_center = x_center)
-#'     
-#'   } else {
-#'     # use equation ?? to sample
-#'     Wkbart = rbind(Ykt_h %*% diag(sqrt(E)),
-#'                    ninvRST %*% diag(sqrt(1 / E)))
-#'     Mkbar = rbind(cbind(matrix(0.0, nrow = m, ncol = m), diag(m)),
-#'                   cbind(diag(m),
-#'                         (diag(Dk, nrow = m) +
-#'                            tcrossprod(Ykt_h %*% diag(sqrt(E))))))
-#'     qrW = qr(t(Wkbart))
-#'     Qk = qr.Q(qrW)
-#'     Rkbar = qr.R(qrW)
-#'     Rktilde = chol(Rkbar %*% Mkbar %*% t(Rkbar) + diag(nrow(Rkbar)))
-#'     logdetcholHk = sum(log(diag(Rktilde))) + 0.5 * sum(log(E))
-#'     
-#'     sample_pkg <- list(label = "sparse", theta_D = 1 / E,
-#'                        Qk = Qk, Rktilde = Rktilde,
-#'                        logdetcholHk = logdetcholHk,
-#'                        Mkbar = Mkbar,
-#'                        Wkbart = Wkbart,
-#'                        x_center = x_center) #inv_metric_est is returned for estimating mass matrix 
-#'   }
-#'   return(sample_pkg)
-#' }
+Form_N_apx <- function(x_center, Ykt_h, Skt_h, E, lmm){
+
+  #' Returns sampling metrics of the approximating Gaussian given the history
+  #' of optimization trajectory
+  #'
+  #' @param x_center The center of the approximating Gaussian
+  #' @param Ykt_h    history of updates along optimization trajectory
+  #' @param Skt_h    history of updates of gradients along optimization trajectory
+  #' @param E        initial diagonal inverse Hessian
+  #' @param lmm      The size of history
+  #'
+  #' @return
+
+  D = length(x_center)
+  if(is.null(Ykt_h)){# cannot approximate Hessian
+    return(NA)}
+
+  Dk = c()
+  thetak = c()
+  m = nrow(Ykt_h)
+  for(i in 1:m){
+    Dk[i] = sum(Ykt_h[i, ] * Skt_h[i, ])
+    thetak[i] = sum(Ykt_h[i, ]^2) / Dk[i]   # curvature checking
+  }
+
+  Rk = matrix(0.0, nrow = m, ncol = m)
+  for(s in 1:m){
+    for(i in 1:s){
+      Rk[i, s] = sum(Skt_h[i, ] * Ykt_h[s, ])
+    }
+  }
+  ninvRST = -backsolve(Rk, Skt_h)
+
+  if( 2*m >= D){
+    # directly calculate inverse Hessian and the cholesky decomposition
+    Hk = diag(E, nrow = D) +
+      crossprod(Ykt_h %*% diag(E, nrow = D), ninvRST) +
+      crossprod(ninvRST, Ykt_h %*% diag(E, nrow = D))  +
+      crossprod(ninvRST,
+                (diag(Dk, nrow = m) +
+                   tcrossprod(Ykt_h %*% diag(sqrt(E), nrow = D))) %*%
+                  ninvRST)
+    cholHk = chol(Hk)
+    logdetcholHk = determinant(cholHk)$modulus
+
+    sample_pkg <- list(label = "full", cholHk = cholHk,
+                       logdetcholHk = logdetcholHk,
+                       x_center = x_center)
+
+  } else {
+    # use equation ?? to sample
+    Wkbart = rbind(Ykt_h %*% diag(sqrt(E)),
+                   ninvRST %*% diag(sqrt(1 / E)))
+    Mkbar = rbind(cbind(matrix(0.0, nrow = m, ncol = m), diag(m)),
+                  cbind(diag(m),
+                        (diag(Dk, nrow = m) +
+                           tcrossprod(Ykt_h %*% diag(sqrt(E))))))
+    qrW = qr(t(Wkbart))
+    Qk = qr.Q(qrW)
+    Rkbar = qr.R(qrW)
+    Rktilde = chol(Rkbar %*% Mkbar %*% t(Rkbar) + diag(nrow(Rkbar)))
+    logdetcholHk = sum(log(diag(Rktilde))) + 0.5 * sum(log(E))
+
+    sample_pkg <- list(label = "sparse", theta_D = 1 / E,
+                       Qk = Qk, Rktilde = Rktilde,
+                       logdetcholHk = logdetcholHk,
+                       Mkbar = Mkbar,
+                       Wkbart = Wkbart,
+                       x_center = x_center) #inv_metric_est is returned for estimating mass matrix
+  }
+  return(sample_pkg)
+}
 
