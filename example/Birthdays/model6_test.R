@@ -77,6 +77,7 @@ data %>%
 model6 <- cmdstan_model(stan_file = "/home/luzhang/Downloads/casestudies-master/Birthdays/gpbf6.stan",
                         include_paths = "/home/luzhang/Downloads/casestudies-master/Birthdays")
 
+
 standata6 <- list(x=data$id,
                   y=log(data$births_relative100),
                   N=length(data$id),
@@ -191,7 +192,7 @@ if(fit_pf_flag){
   N_sam_DIV = 5   # samples for ELBO evaluation
   N_sam = 100
   lmm = 6 # history size
-  seed_list = 1:10
+  seed_list = 1:20
   
   
   D <- get_num_upars(posterior)
@@ -199,11 +200,12 @@ if(fit_pf_flag){
   
   t <- proc.time()
   opath <- opt_path_stan_parallel(seed_list, seed_list, mc.cores, model, standata6,
-                                  init_bound = 2.0, N1, N_sam_DIV, N_sam, 
+                                  init_bound = init_bound, N1, N_sam_DIV, N_sam, 
                                   factr_tol, lmm) # plot for 8school init_bound = 15
   print(proc.time() - t)
   
-  pick_samples_IR <- Imp_Resam_WOR(opath, n_inits = 20, seed = 1)
+  pick_samples_IR <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
+  #pick_samples_IR <- Imp_Resam_WOR(opath, n_inits = 20, seed = 1)
   pick_samples <- pick_samples_IR
   pf_fn_calls <- sapply(opath, f <- function(x){x$fn_call})
   pf_gr_calls <- sapply(opath, f <- function(x){x$gr_call})
@@ -262,12 +264,12 @@ if(fit_PhI_flag == TRUE){
 fit_PhI_pf_flag = FALSE
 if(fit_PhI_pf_flag == TRUE){
   ## transform draws from pathfinder into constrained space
-  init_pf_ls <- apply(pick_samples, 2, 
+  init_pf_ls <- apply(pick_samples[, 1:20], 2, 
                       f <- function(x){constrain_pars(posterior, x)})
   
   fit_PhI_pf <- model6$sample(
     data = standata6,
-    seed = 123,
+    seed = 1234,
     init = init_pf_ls,
     chains = 20,
     parallel_chains = 10,
@@ -310,7 +312,7 @@ if(fit_PhI_pf_flag == TRUE){
 
 ## check plots ##
 check_dim <- c(424, 426)
-for(first_check in 1:3){
+for(first_check in 1:4){
   check_dim <- c(2 * first_check - 1, 2 * first_check)
   
   unconstrained_draws_PI <- PhaseI_last_draw #first_sample_draw #PhaseI_last_draw #PhaseI_last_draw[[i]] #ADVI_fullrank_draw[[i]][1:20, ]
@@ -334,9 +336,9 @@ for(first_check in 1:3){
   #        y = unconstrained_draws_PI[, check_dim[2]], col = "green",
   #        pch = 16)
   
-  # points(x = unconstrained_draws_PI_pf[, check_dim[1]],
-  #        y = unconstrained_draws_PI_pf[, check_dim[2]], col = "blue",
-  #        pch = 16)
+  points(x = unconstrained_draws_PI_pf[, check_dim[1]],
+         y = unconstrained_draws_PI_pf[, check_dim[2]], col = "blue",
+         pch = 16)
   
   points(x = pick_samples[check_dim[1], ], y = pick_samples[check_dim[2], ],
          col = "orange", pch = 16)
@@ -353,24 +355,24 @@ if(ncol(pick_samples) == 1){
   a = wpp(rbind(t(pick_samples), t(pick_samples)), 
           mass = rep(1 / 2, 2))
 }else{
-  a = wpp(t(pick_samples), 
-          mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
+  a = wpp(t(pick_samples[, 1:20]), 
+          mass = rep(1 / ncol(pick_samples[, 1:20]), ncol(pick_samples[, 1:20])))
 }
 b = wpp(ref_samples, mass = rep(1 / nrow(ref_samples), nrow(ref_samples)))
-w_d_pf <- wasserstein(a, b, p = 2); w_d_pf #5.66 #6.65
+w_d_pf <- wasserstein(a, b, p = 1); w_d_pf #5.45  #5.51 
 
 
 # last samples of phase I #
 a_phI = wpp(PhaseI_last_draw, #first_sample_draw, #PhaseI_last_draw, #[-c(2, 7, 12, 15, 16), ],
             mass = rep(1 / nrow(PhaseI_last_draw),
                        nrow(PhaseI_last_draw)))
-w_d_phI <- wasserstein(a_phI, b, p = 2); w_d_phI # 12.30
+w_d_phI <- wasserstein(a_phI, b, p = 1); w_d_phI # 9.65
 
 # last samples of pathfinder + phase I#
 a_phI_pf = wpp(PhaseI_pf_last_draw, #first_sample_draw, #PhaseI_last_draw, #[-c(2, 7, 12, 15, 16), ],
                mass = rep(1 / nrow(PhaseI_pf_last_draw),
                           nrow(PhaseI_pf_last_draw)))
-w_d_phI_pf <- wasserstein(a_phI_pf, b, p = 2); w_d_phI_pf # 5.35 #5.469713
+w_d_phI_pf <- wasserstein(a_phI_pf, b, p = 1); w_d_phI_pf # 5.32 
 
 ## cost ##
 # pf
@@ -407,11 +409,20 @@ dta_phI_pf <- data.frame(x = c(ref_samples[, check_dim[1]],
                       label = c(rep("1", length(ref_samples[, check_dim[1]])),
                                 rep("2", length(PhaseI_pf_last_draw[, check_dim[2]]))))
 
+dta_pf <- data.frame(x = c(ref_samples[, check_dim[1]], 
+                           pick_samples[check_dim[1], ]),
+                         y = c(ref_samples[, check_dim[2]],
+                               pick_samples[check_dim[2], ]),
+                         label = c(rep("1", length(ref_samples[, check_dim[1]])),
+                                   rep("2", length(pick_samples[check_dim[1], ]))))
+
+
+
 p_phI <- ggplot(dta_phI, aes(x=x, y=y, color = label) ) +
   geom_point(size = 3) +
   scale_color_manual(breaks = c("1", "2"),
                      values=c(alpha("grey", 0.1), "orange"))+
-  xlab("") + ylab("") +
+  xlab("parameter 1") + ylab("parameter 2") +
   theme(legend.position='none')
 p_phI
 
@@ -419,9 +430,17 @@ p_phI_pf <- ggplot(dta_phI_pf, aes(x=x, y=y, color = label) ) +
   geom_point(size = 3) +
   scale_color_manual(breaks = c("1", "2"),
                      values=c(alpha("grey", 0.1), "orange"))+
-  xlab("") + ylab("") +
+  xlab("parameter 1") + ylab("parameter 2") +
   theme(legend.position='none')
 p_phI_pf
+
+p_pf <- ggplot(dta_pf, aes(x=x, y=y, color = label) ) +
+  geom_point(size = 3) +
+  scale_color_manual(breaks = c("1", "2"),
+                     values=c(alpha("grey", 0.1), "orange"))+
+  xlab("parameter 1") + ylab("parameter 2") +
+  theme(legend.position='none')
+p_pf
 
 ggsave("birthday_pts.eps",
        plot = p_phI,
@@ -435,6 +454,11 @@ ggsave("birthday_pts_pf.eps",
        path = "./Birthdays/",
        width = 7.0, height = 5.0, units = "in")
 
+ggsave("birthday_pts_pf2.eps",
+       plot = p_pf,
+       device = cairo_ps,
+       path = "./Birthdays/",
+       width = 7.0, height = 5.0, units = "in")
 
 # plot(1:length(opath[[1]]$lgnorms), opath[[1]]$lgnorms)
 
@@ -457,5 +481,91 @@ ggsave("birthday_p1_pf.eps",
        device = cairo_ps,
        path = "./Birthdays/",
        width = 7.0, height = 5.0, units = "in")
+
+
+## prediction check ##
+mean_brith <- mean(data$births)
+f_ref_sams <- 
+  apply(unconstrained_draws, 1, f <- function(x){constrain_pars(posterior, x)$f})
+Est_f_ref <- apply(exp(f_ref_sams), 1, mean)
+Est_f_ref <- Est_f_ref / 100 * mean_brith
+
+f_pf_sams <- 
+  apply(pick_samples[, 1:20], 2, f <- function(x){constrain_pars(posterior, x)$f})
+Est_f_pf <- apply(exp(f_pf_sams), 1, mean)
+Est_f_pf <- Est_f_pf / 100 * mean_brith
+
+f_phI_sams <- 
+  apply(PhaseI_last_draw, 1, f <- function(x){constrain_pars(posterior, x)$f})
+Est_f_phI <- apply(exp(f_phI_sams), 1, mean)
+Est_f_phI <- Est_f_phI / 100 * mean_brith
+
+
+f_pf_phI_sams <- 
+  apply(PhaseI_pf_last_draw, 1, f <- function(x){constrain_pars(posterior, x)$f})
+#Est_f_pf_phI <- exp(apply(f_pf_phI_sams, 1, median))
+Est_f_pf_phI <- apply(exp(f_pf_phI_sams), 1, mean)
+Est_f_pf_phI <- Est_f_pf_phI / 100 * mean_brith
+
+plot(Est_f_ref, Est_f_pf, xlab = "Ef from reference samples",
+     ylab = "Ef from pathfinder samples")
+abline(a = 0, b = 1)
+
+
+plot(Est_f_ref, Est_f_phI, xlab = "Ef from reference samples",
+     ylab = "Ef from last iter of Stan Phase I samples")
+abline(a = 0, b = 1)
+
+plot(Est_f_ref, Est_f_pf_phI, xlab = "Ef from reference samples",
+     ylab = "Ef from last iter of Stan Phase I samples with inits from pf")
+abline(a = 0, b = 1)
+
+
+dat_compar <- data.frame(Est_f_ref = Est_f_ref, Est_f_pf = Est_f_pf)
+p_compar <- ggplot(dat_compar, aes(x=Est_f_ref, y=Est_f_pf)) + 
+  geom_point(alpha = 0.2) +
+  xlim(6000, 13000) + ylim(6000, 13000) + 
+  geom_line(data = data.frame(x = c(6000, 13000), y = c(6000, 13000)),
+            aes(x = x, y = y), color = "red", linetype="dashed") +
+  labs(x="number of births (reference)", y="number of births (Pathfinder)") +
+  theme(plot.title = element_text(hjust = 0.5)) + theme_bw()
+p_compar
+ggsave("birth_pred_compar_pf.eps", #"8-school_opt_tr22.eps"
+       plot = p_compar,
+       device = cairo_ps,
+       path = "./Birthdays/",
+       width = 4.0, height = 4.0, units = "in")
+
+
+dat_compar <- data.frame(Est_f_ref = Est_f_ref, Est_f_phI = Est_f_phI)
+p_compar2 <- ggplot(dat_compar, aes(x=Est_f_ref, y=Est_f_phI)) + 
+  geom_point(alpha = 0.2) +
+  xlim(6000, 13000) + ylim(6000, 13000) + 
+  geom_line(data = data.frame(x = c(6000, 13000), y = c(6000, 13000)),
+            aes(x = x, y = y), color = "red", linetype="dashed") +
+  labs(x="number of births (reference)", y="number of births (NUTS)") +
+  theme(plot.title = element_text(hjust = 0.5)) + theme_bw()
+p_compar2
+ggsave("birth_pred_compar_phI.eps", #"8-school_opt_tr22.eps"
+       plot = p_compar2,
+       device = cairo_ps,
+       path = "./Birthdays/",
+       width = 4.0, height = 4.0, units = "in")
+
+dat_compar <- data.frame(Est_f_ref = Est_f_ref, Est_f_pf_phI = Est_f_pf_phI)
+p_compar3 <- ggplot(dat_compar, aes(x=Est_f_ref, y=Est_f_pf_phI)) + 
+  geom_point(alpha = 0.2) +
+  xlim(6000, 13000) + ylim(6000, 13000) + 
+  geom_line(data = data.frame(x = c(6000, 13000), y = c(6000, 13000)),
+            aes(x = x, y = y), color = "red", linetype="dashed") +
+  labs(x="number of births (reference)", y="number of births (pathfinder + NUTS)") +
+  theme(plot.title = element_text(hjust = 0.5)) + theme_bw()
+p_compar3
+ggsave("birth_pred_compar_pf_phI.eps", #"8-school_opt_tr22.eps"
+       plot = p_compar3,
+       device = cairo_ps,
+       path = "./Birthdays/",
+       width = 4.0, height = 4.0, units = "in")
+
 
 
