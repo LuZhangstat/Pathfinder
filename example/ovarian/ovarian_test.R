@@ -41,14 +41,14 @@ model_cmd <- cmdstan_model(file)
 fit_stan_flag <- FALSE
 if(fit_stan_flag){
   fit_stan <- model_cmd$sample(data = data,
-                        chains=4, parallel_chains=4,
-                        seed = 1,
-                        adapt_delta = 0.9,
-                        thin = 10,
-                        iter_warmup = 10000,
-                        iter_sampling = 25000,
-                        show_messages = TRUE,
-                        sig_figs = 16)
+                               chains=4, parallel_chains=4,
+                               seed = 1,
+                               adapt_delta = 0.9,
+                               thin = 10,
+                               iter_warmup = 10000,
+                               iter_sampling = 25000,
+                               show_messages = TRUE,
+                               sig_figs = 16)
   
   fit_stan$print("lp__")
   fit_stan$save_object(file = "../example/overian/overian_ref.RDS")
@@ -59,12 +59,12 @@ if(fit_stan_flag){
   draws <- fit_stan$draws()
   Sum_M <- summarise_draws(subset(draws, regex=TRUE))
   summary(Sum_M$ess_bulk); summary(Sum_M$ess_tail)
-
+  
   draws <- as_draws_matrix(draws)
   Stan_draws <- matrix(draws, nrow = dim(draws)[1])
   colnames(Stan_draws) <- dimnames(draws)$variable
   unconstrained_draws <- unconstrain_cmd_draws(Stan_draws, posterior)
-
+  
   lp_INV <- quantile(Stan_draws[, "lp__"], c(0.005, 0.995))
   
   save(file = "../example/overian/reference_overian.RData",
@@ -78,12 +78,12 @@ fit_pf_flag <- FALSE
 if(fit_pf_flag){
   mc.cores = parallel::detectCores() - 2
   ## tuning parameters
-  init_bound = 5.0 # parameter for initial distribution 
+  init_bound = 2.0 # parameter for initial distribution 
   N1 = 1000    # maximum iters in optimization
   factr_tol = 1e2 # relative tolerance = 1-4 is not enough, should use at least 1e7
   N_sam_DIV = 5   # samples for ELBO evaluation
   N_sam = 100
-  lmm = 6 # history size
+  lmm = 6     # history size
   seed_list = 1:20
   
   D <- get_num_upars(posterior)
@@ -95,19 +95,46 @@ if(fit_pf_flag){
                                   factr_tol, lmm) # plot for 8school init_bound = 15
   print(proc.time() - t)
   
-  pick_samples_IR <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
-  #pick_samples_IR <- Imp_Resam_WOR(opath, n_inits = 100, seed = 1)
   #pick_samples_IR <- filter_samples_resam(opath, n_inits = 1000, seed = 1)
-  pick_samples <- pick_samples_IR
+  pick_samples <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
   pf_fn_calls <- sapply(opath, f <- function(x){x$fn_call})
   pf_gr_calls <- sapply(opath, f <- function(x){x$gr_call})
-  save(file = "../example/overian/opath_int5.RData", #_h100 _init
+  save(file = "../example/overian/opath.RData",
        list = c("opath", "pick_samples", "pf_fn_calls", "pf_gr_calls"))
 }else{
-  load("../example/overian/opath_init.RData")
+  load("../example/overian/opath.RData")
 }
 
-
+## pathfinder with initials from reference samples##
+fit_pf_init_flag = FALSE
+if(fit_pf_init_flag){
+  mc.cores = parallel::detectCores() - 2
+  ## tuning parameters
+  N1 = 1000    # maximum iters in optimization
+  factr_tol = 1e2 # relative tolerance = 1-4 is not enough, should use at least 1e7
+  N_sam_DIV = 5   # samples for ELBO evaluation
+  N_sam = 100
+  lmm = 6 # history size
+  seed_list = 1:20
+  
+  D <- get_num_upars(posterior)
+  cat("No. pars:", D," lmm in L-BFGS: ", lmm, "\n")
+  
+  init_ls <- list()
+  for (s in 1:length(seed_list)){
+    init_ls[[s]] <- unconstrained_draws[s,]
+  }
+  t <- proc.time()
+  opath <- opt_path_stan_init_parallel(
+    init_ls, mc.cores, model, data = data, init_bound = 2.0, 
+    N1, N_sam_DIV, N_sam, factr_tol, lmm, seed_list)
+  print(proc.time() - t)
+  pick_samples <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
+  pf_fn_calls <- sapply(opath, f <- function(x){x$fn_call})
+  pf_gr_calls <- sapply(opath, f <- function(x){x$gr_call})
+  save(file = "../example/overian/opath_init.RData",
+       list = c("opath", "pick_samples", "pf_fn_calls", "pf_gr_calls"))
+}
 
 ## check plots ##
 check_dim <- c(1, 2)
@@ -138,9 +165,9 @@ for(first_check in 1:10){
 }
 
 
-opt_tr_res <- get_opt_tr(opath)#opath #lp_opath[[15]]$opath
+opt_tr_res <- get_opt_tr(opath) 
 check_dim <- c(1, 3029)#c(1631, 3029)#c(3029, 2655) #c(1, 2)
-check_dim <- c(1, 1528)
+#check_dim <- c(1, 1538)
 
 dta_sam <- data.frame(sam_x = pick_samples[check_dim[1], ],
                       sam_y = pick_samples[check_dim[2], ])
@@ -156,29 +183,29 @@ dta_opt <- data.frame(
 )
 dta_opt$tr_id = factor(dta_opt$tr_id)
 
-p_check <- ggplot(dta_check, aes(x=x, y=y) ) +
-  stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
-  scale_fill_distiller(palette=4, direction=-1) +
-  scale_x_continuous(expand = c(0, 0), limits = c(-40, 50)) +
-  scale_y_continuous(expand = c(0, 0), limits = c(-10, 18)) +
-  #geom_point(data = dta_sam, aes(x=sam_x, y=sam_y), colour="red", size = 3) +
-  xlab("") + ylab("") +
-  theme(
-    legend.position='none'
-  )
-
-p_check
-ggsave("overian_1_2.eps", #"8-school_opt_tr22.eps"
-       plot = p_check,
-       device = cairo_ps,
-       path = "../example/overian/",
-       width = 5.0, height = 5.0, units = "in")
+# p_check <- ggplot(dta_check, aes(x=x, y=y) ) +
+#   stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
+#   scale_fill_distiller(palette=4, direction=-1) +
+#   scale_x_continuous(expand = c(0, 0), limits = c(-10, 20)) + #c(-40, 50)) +
+#   scale_y_continuous(expand = c(0, 0), limits = c(-30, 5)) + #c(-10, 18)) +
+#   #geom_point(data = dta_sam, aes(x=sam_x, y=sam_y), colour="red", size = 3) +
+#   xlab("") + ylab("") +
+#   theme(
+#     legend.position='none'
+#   )
+# 
+# p_check
+# ggsave("overian_1_2.eps", #"8-school_opt_tr22.eps"
+#        plot = p_check,
+#        device = cairo_ps,
+#        path = "../example/overian/",
+#        width = 5.0, height = 5.0, units = "in")
 
 p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
   scale_fill_distiller(palette=4, direction=-1) +
-  #scale_x_continuous(expand = c(0, 0), limits = c(-40, 50)) +
-  #scale_y_continuous(expand = c(0, 0), limits = c(-10, 18)) +
+  scale_x_continuous(expand = c(0, 0), limits =c(-40, 50)) + #c(-10, 20)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(-10, 18)) + #c(-30, 5)) +
   geom_point(data = dta_opt, 
              aes(x = optim_x, y = optim_y, group = tr_id, 
                  color = optim_ind, alpha = 0.5), size = 1) +
@@ -193,7 +220,7 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   ) 
 p_check1
 
-ggsave("overian_1_2_tr_init.eps", #"8-school_opt_tr22.eps"
+ggsave("overian_1_2_tr.eps", #_init 
        plot = p_check1,
        device = cairo_ps,
        path = "../example/overian/",
@@ -248,59 +275,34 @@ p_compar <- ggplot(dat_compar, aes(x=Est_p, y=Est_p_pf)) + geom_point() +
   theme_bw() + xlim(0, 1) + ylim(0, 1) + 
   labs(x="Probability (reference)", y="Probability (Pathfinder)")
 p_compar
-ggsave("overian_pred_compar_init.eps", 
+ggsave("overian_pred_compar.eps",  #_init
        plot = p_compar,
        device = cairo_ps,
        path = "../example/overian/",
        width = 4.0, height = 4.0, units = "in")
 
 
-## for fun ##
-init_ls <- list()
-for (s in 1:length(seed_list)){
-  init_ls[[s]] <- unconstrained_draws[s,]
-}
-t <- proc.time()
-opath <- opt_path_stan_init_parallel(
-  init_ls, mc.cores, model, data = data, init_bound = 2.0, 
-  N1, N_sam_DIV, N_sam, factr_tol, lmm, seed_list)
-print(proc.time() - t)
-pick_samples <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
-
-## check ADVI ##
-VI_mf <- model_cmd$variational(data = data,
-                seed = 4,
-                refresh = 1,
-                sig_figs = 18,
-                algorithm = "meanfield",
-                output_samples = 100)
-str(VI_mf$draws())
-Sum_f_mf<- 
-  summarise_draws(plogis(subset(VI_mf$draws(), variable = "f", regex=TRUE)), "mean")
-
-plot(Sum_f$mean, Sum_f_mf$mean, xlim = c(0, 1), ylim = c(0, 1))
-abline(a = 0, b = 1)
 
 # check for fun #
-which.max(sapply(opath, f <- 
-         function(x){mean(-x$DIV_save$fn_draws - x$DIV_save$lp_approx_draws)}))
-pick_samples <- opath[[16]]$DIV_save$repeat_draws
-library(ggcorrplot)
-cor_M <- cor(unconstrained_draws)
-p_cor <- ggcorrplot(cor_M)
+# which.max(sapply(opath, f <-
+#                    function(x){mean(-x$DIV_save$fn_draws - x$DIV_save$lp_approx_draws)}))
+# pick_samples <- opath[[10]]$DIV_save$repeat_draws
+# library(ggcorrplot)
+# cor_M <- cor(unconstrained_draws)
+# p_cor <- ggcorrplot(cor_M)
 
-library(transport)
-if(ncol(pick_samples) == 1){
-  a = wpp(rbind(t(pick_samples), t(pick_samples)),
-          mass = rep(1 / 2, 2))
-}else{
-  a = wpp(t(pick_samples),
-          mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
-}
-b = wpp(unconstrained_draws, mass = rep(1 / nrow(unconstrained_draws), 
-                                        nrow(unconstrained_draws)))
-w_d_pf <- wasserstein(a, b, p = 1)#wasserstein(a, b, p = 2); w_d_pf
-w_d_pf   #96.137 vs #98.15165
+# library(transport)
+# if(ncol(pick_samples) == 1){
+#   a = wpp(rbind(t(pick_samples), t(pick_samples)),
+#           mass = rep(1 / 2, 2))
+# }else{
+#   a = wpp(t(pick_samples),
+#           mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
+# }
+# b = wpp(unconstrained_draws, mass = rep(1 / nrow(unconstrained_draws), 
+#                                         nrow(unconstrained_draws)))
+# w_d_pf <- wasserstein(a, b, p = 1)#wasserstein(a, b, p = 2); w_d_pf
+# w_d_pf   #96.19 vs #98.15165
 
 
 library("scatterplot3d")
@@ -318,15 +320,48 @@ stp3 <- scatterplot3d(unconstrained_draws[, c(1631, 2655, 3029)],
 
 dev.off()
 
-
+## check for fun ##
 stp3 <- scatterplot3d(unconstrained_draws[, c(1631, 3021, 3029)], 
                       cex.symbols = 0.1, xlab = bquote(lambda[93]),
                       ylab = bquote(lambda[1483]), zlab = bquote(lambda[1491]))
 
 
 stp3$points3d(t(pick_samples[c(1631, 2655, 3029), ]), col = "red", pch = 16)
-
-
-stp3 <- scatterplot3d(unconstrained_draws[, c(1, 3029, 1631)], cex.symbols = 0.1)
-stp3$points3d(t(pick_samples[c(1, 3029, 1631), ]), col = "red", pch = 16)
+check_dims <- c(1, 1631, 1538) #c(1631, 3021, 3029) #
+par(mfrow=c(2,2))
+for(ind in 1:20){
+  est_ELBO = round(mean(-opath[[ind]]$DIV_save$fn_draws -
+                          opath[[ind]]$DIV_save$lp_approx_draws), digits = 2)
+  cat(ind, "\t", opath[[ind]]$DIV_save$DIV, "\t",
+      mean(-opath[[ind]]$DIV_save$fn_draws -
+             opath[[ind]]$DIV_save$lp_approx_draws), "\n") #c(1, 3029, 1631) #c(1631, 2655, 3029)
+  pick_samples <- opath[[ind]]$DIV_save$repeat_draws
+  stp3 <- scatterplot3d(unconstrained_draws[, check_dims], 
+                        cex.symbols = 0.1,
+                        xlim = range(c(opath[[ind]]$y[, check_dims[1]], 
+                                       unconstrained_draws[, check_dims[1]])),
+                        ylim = range(c(opath[[ind]]$y[, check_dims[2]], 
+                                       unconstrained_draws[, check_dims[2]])),
+                        zlim = range(c(opath[[ind]]$y[, check_dims[3]], 
+                                       unconstrained_draws[, check_dims[3]])),
+                        xlab = "", ylab = "", zlab = "",
+                        angle = 45,
+                        main = paste0(ind, "th pf, est ELBO:", est_ELBO))
+  stp3$points3d(t(pick_samples[check_dims, ]), col = "red", pch = 16)
+  stp3$points3d(opath[[ind]]$y[1:as.integer(nrow(opath[[ind]]$y) / 2), 
+                               check_dims], col = "orange", pch = 16)
+  stp3$points3d(opath[[ind]]$y[as.integer(nrow(opath[[ind]]$y) / 2):nrow(opath[[ind]]$y), 
+                               check_dims], col = "green", pch = 16)
+  stp3$points3d(t(opath[[ind]]$y[1, check_dims]), col = "yellow", pch = 16)
+  stp3$points3d(t(opath[[ind]]$y[nrow(opath[[ind]]$y), check_dims]),
+                col = "blue", pch = 16)
+  readline(prompt="Press [enter] to continue:")
+  f_sams_pf <- 
+    apply(pick_samples, 2, f <- function(x){constrain_pars(posterior, x)$f})
+  Est_f <- rowMeans(plogis(f_sams_pf))
+  plot(Sum_f$mean, Est_f, xlab = "HMC", xlim = c(0, 1), ylim = c(0, 1),
+       ylab = "Pathfinder", main = paste0("est ELBO:", est_ELBO))
+  abline(a = 0, b = 1)
+  readline(prompt="Press [enter] to continue:")
+}
 
