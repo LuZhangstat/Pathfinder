@@ -12,7 +12,7 @@ source("../utils/sim_pf.R")
 load("../results/lp_posteriordb_phI_adapt_default.RData") # Pathfinder #_resam_all #_resam_each
 load("../results/lp_posteriordb_LBFGS_h6.RData")
 load("../results/PhI_100_h10.RData")
-load("../results/ADVI_100_RVI.RData")
+load("../results/ADVI_100_updat.RData")
 load("../results/multi_pf_samples_default.RData")
 
 
@@ -310,10 +310,10 @@ for(i in 1:49){ #length(model_record)
     }
     b = wpp(ref_samples, mass = rep(1 / nrow(ref_samples), nrow(ref_samples)))
     w_d_pf <- wasserstein(a, b, p = 1); w_d_pf
-    
+
     W_d_100_pf[j, i] = w_d_pf
-    
-    # ### samples from multi_path pathfinder ###
+
+    ### samples from multi_path pathfinder ###
     pick_samples_M <- lp_multi_opath[[i]][[j]]$pick_samples
     a_M = wpp(t(pick_samples_M),
             mass = rep(1 / ncol(pick_samples_M), ncol(pick_samples_M)))
@@ -325,21 +325,25 @@ for(i in 1:49){ #length(model_record)
     # that makes the computation of Wasserstein distance to be extremely slow.
     # The resulting Wasserstein distances are all very large. We skip those cases
     # and report Inf. We truncate those large 1-W distances in the summary report)
-    # if( (i == 8 && j == 55) |
-    #     (i == 8 && j == 64) |
-    #     (i == 8 && j == 66) |
-    #     (i == 8 && j == 94) |
-    #     (i == 10 && j == 16) |
-    #     (i == 13 && j == 12) |
-    #     (i == 38 && j == 15) |
-    #     (i == 38 && j == 68) |
-    #     (i == 39 && j == 10) |
-    #     (i == 40 && j == 62)){
-    if((i == 10 && j == 61) |
-       (i == 38 && j == 55) |
-       (i == 39 && j == 10) |
-       (i == 42 && j == 94) |
-       (i == 46 && j == 95)){
+    if( (i == 8 && j == 55) |
+        (i == 8 && j == 64) |
+        (i == 8 && j == 66) |
+        (i == 8 && j == 68) |
+        (i == 8 && j == 94) |
+        (i == 10 && j == 16) |
+        (i == 13 && j == 12) |
+        (i == 25 && j == 99) |
+        (i == 26 && j == 40) |
+        (i == 38 && j == 15) |
+        (i == 38 && j == 68) |
+        (i == 39 && j == 10) |
+        (i == 40 && j == 62) |
+        (i == 42 && j == 62)){
+    # if((i == 10 && j == 61) |
+    #    (i == 38 && j == 55) |
+    #    (i == 39 && j == 10) |
+    #    (i == 42 && j == 94) |
+    #    (i == 46 && j == 95)){
       w_d_ADVI_mf = Inf
       W_d_100_ADVI_mf[j, i] = Inf
     }else{
@@ -364,6 +368,10 @@ for(i in 1:49){ #length(model_record)
         "ADVI meanfield:", W_d_100_ADVI_mf[j, i], "\t",
         "ADVI fullrank:", W_d_100_ADVI_fr[j, i], "\n")
   }
+  
+  save(file = "../results/wasserstein_100_default_W1_WR_updat.RData",
+       list = c("W_d_100_pf", "W_d_100_pf_IR", "W_d_100_ADVI_mf",
+                "W_d_100_ADVI_fr"))
 }
 proc.time() - t_0
 
@@ -374,13 +382,13 @@ for(i in 1:49){
               ADVI_mf_w_d_qtils[, i], ADVI_fr_w_d_qtils[, i]))
 }
 
-# save(file = "../results/wasserstein_100_default_W1_WR.RData",
-#      list = c("W_d_100_pf", "W_d_100_pf_IR", "W_d_100_ADVI_mf", 
-#               "W_d_100_ADVI_fr"))
+save(file = "../results/wasserstein_100_default_W1_WR_updat.RData",
+     list = c("W_d_100_pf", "W_d_100_pf_IR", "W_d_100_ADVI_mf",
+              "W_d_100_ADVI_fr"))
 
 #large_K
-load("../results/wasserstein_100_default_W1_WR.RData")
-W_d_100_pf[100, ]
+load("../results/wasserstein_100_default_W1_WR_updat.RData")
+W_d_100_ADVI_mf[100, ]
 
 ## check the output ##
 pf_w_d_qtils <- apply(W_d_100_pf, 2, 
