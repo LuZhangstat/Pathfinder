@@ -16,7 +16,7 @@ Instructions
 ---------
 (note: since the function **pdb_local()** requires folder posteriordb to be in a git repository, please use **git clone** to download the repository or configure a remote in the unzipped repository)
 
-#### HMC vs L-BFGS exam in Introduction (old test, no longer present in the paper, but the saved result of check_LBFGS.R is reused in the experiements in Section 3):
+#### HMC vs L-BFGS exam in Introduction (old test, no longer present in the paper, but the result of check_LBFGS.R is reused in the experiments in Section 3):
 1. Optimization: posteriordb_check/phaseI_check/check_LBFGS.R
 2. Stan phase I: posteriordb_check/phaseI_check/main.R
 3. Plots: posteriordb_check/pic.R
