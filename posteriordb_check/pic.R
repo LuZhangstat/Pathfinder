@@ -3,6 +3,7 @@ library(ggplot2)
 library(posteriordb)
 library(RColorBrewer)
 source("../utils/lp_utils.R")
+source("../utils/sim_pf.R")
 pd <- pdb_local() # Posterior database connection
 pn <- posterior_names(pd)
 
@@ -12,159 +13,162 @@ cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2",
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 
-## HMC vs L-BFGS plot in Introduction ##
-load("../results/lp_posteriordb_LBFGS_h6.RData")
-load("../results/lp_posteriordb_explore_h6.RData")
-M = 20
-df <- data.frame(n_counts = c(c(abs(lp_LBFGS_n_gr)), c(lp_explore_n_leapfrog)),
-                 model = rep(rep(pn[model_record], each = M), 2),
-                 n_leapfrogs = rep(c(lp_explore_n_leapfrog), 2),
-                 not_reach_target = 
-                   c(rep(apply(lp_LBFGS_n_gr, 2, 
-                               f <- function(x){as.numeric(any(x < 0))}), 
-                         each = M), rep(2, M*length(model_record))))
-
-width <- 12.0
-height <- 8.0
-setEPS()
-postscript("../pics/box_compar_LBFGS_log.eps",  #_resam_each
-           width = width, height = height)
-p_box_compar <- df %>% mutate(type= c("L-BFGS", "L-BFGS(have minor modes)", 
-                                      "Stan Phase I")
-                              [not_reach_target + 1]) %>%
-  ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
-             x = n_counts, color = type)) + 
-  geom_boxplot() + 
-  scale_colour_manual(values=cbbPalette) + 
-  scale_x_log10(breaks=c(10, 1e2, 1e3, 1e4, 1e5), 
-                labels = c("10", "100", "1000", "10,000", "100,000")) + 
-  ylab("") + xlab("") + #xlab("calls to log density and gradient") + 
-  theme_bw(base_size = 12 )+
-  theme(legend.position="top", legend.title = element_blank()) 
-print(p_box_compar)
-dev.off()
+## HMC vs L-BFGS plot in Introduction (old test)##
+# load("../results/lp_posteriordb_LBFGS_h6.RData")
+# load("../results/lp_posteriordb_explore_h6.RData")
+# M = 20
+# df <- data.frame(n_counts = c(c(abs(lp_LBFGS_n_gr)), c(lp_explore_n_leapfrog)),
+#                  model = rep(rep(pn[model_record], each = M), 2),
+#                  n_leapfrogs = rep(c(lp_explore_n_leapfrog), 2),
+#                  not_reach_target = 
+#                    c(rep(apply(lp_LBFGS_n_gr, 2, 
+#                                f <- function(x){as.numeric(any(x < 0))}), 
+#                          each = M), rep(2, M*length(model_record))))
+# 
+# width <- 12.0
+# height <- 8.0
+# setEPS()
+# postscript("../pics/box_compar_LBFGS_log.eps",  #_resam_each
+#            width = width, height = height)
+# p_box_compar <- df %>% mutate(type= c("L-BFGS", "L-BFGS(have minor modes)", 
+#                                       "Stan Phase I")
+#                               [not_reach_target + 1]) %>%
+#   ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
+#              x = n_counts, color = type)) + 
+#   geom_boxplot() + 
+#   scale_colour_manual(values=cbbPalette) + 
+#   scale_x_log10(breaks=c(10, 1e2, 1e3, 1e4, 1e5), 
+#                 labels = c("10", "100", "1000", "10,000", "100,000")) + 
+#   ylab("") + xlab("count of log density and its gradient evaluation ") + #xlab("calls to log density and gradient") + 
+#   theme_bw(base_size = 12 )+
+#   theme(legend.position="top", legend.title = element_blank()) 
+# print(p_box_compar)
+# dev.off()
 
 ## Plots in Section 3 ##
 load("../results/lp_posteriordb_LBFGS_h6.RData")
 load("../results/lp_posteriordb_phI_adapt_default.RData")
 
-### Wasserstein distance check for 100 repeats ###
-M = 100
-load("../results/wasserstein_phI_adapt_default.RData")
+# ### Wasserstein distance check for 100 repeats ###
+# M = 100
+# load("../results/wasserstein_phI_adapt_default_RVI.RData")
+# 
+# # check pathfinder vs phase I warmup
+# pf_vs_phI <- (w_d_matrix[, "pf"] / w_d_matrix[, "PhI"])
+# summary(pf_vs_phI)
+# quantile(pf_vs_phI, c(0.05, 0.5, 0.95))
+# 
+# pf_vs_phI <- (w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "PhI"])
+# summary(pf_vs_phI)
+# quantile(pf_vs_phI, c(0.05, 0.5, 0.95))
+# table(pf_vs_phI<1.2)
+# max(pf_vs_phI)
+# 
+# ## rank methods ##
+# rank_score <- apply(w_d_matrix[, c("pf", "pf_20_IR", "PhI", "meanfield", 
+#                                    "meanfield center", "fullrank")], 1, 
+#                     f <- function(x){order(order(x))})
+# table(rank_score[2, ]==1)
+# table(rank_score[2, ]==2)
+# table(rank_score[2, ]<4)
+# table(rank_score[1, ]==1)
+# table(rank_score[3, ]<3)
+# rowSums(rank_score)
+# round(rowMeans(rank_score), 1)
+# 
+# # faceted rank histograms
+# rank_dat = data.frame(rank = c(rank_score),
+#                       label = rep(c("pathfinder", 
+#                                     "multi-path pathfinder", 
+#                                     "Stan Phase I",
+#                                     "mean-field ADVI",
+#                                     "mean-field center",
+#                                     "dense ADVI"), length(model_record)))
+# 
+# p_rank <- ggplot(rank_dat, aes(x = rank)) + geom_histogram(bins = 6) + 
+#   facet_wrap(~label)
+# p_rank
+# width <- 8.0
+# height <- 4.0
+# setEPS()
+# postscript("../pics/phI_adapt_default/rank_test.eps",  #_resam_each
+#            width = width, height = height)
+# print(p_rank)
+# dev.off()
+# 
+# ## rank comparision ##
+# rank_M <- matrix(NA, 6, 6)
+# method_names <- c("pf", "pf_20_IR", "PhI", "meanfield", 
+#                   "meanfield center", "fullrank")
+# for(A in 1:6){
+#   for(B in 1:6){
+#     rank_M[A, B] <- sum(w_d_matrix[, method_names[A]] < 
+#                           w_d_matrix[, method_names[B]])
+#   }
+# }
+# rownames(rank_M) <- c("pf <", "pf_20_IR <", "PhI <", "meanfield <", 
+#                       "meanfield center <", "fullrank <")
+# colnames(rank_M) <- c("pf", "pf_20_IR", "PhI", "meanfield", 
+#                       "meanfield center", "fullrank")
+# rank_M <- round(rank_M/49, 2)
+# rank_M
+# 
+# # compare pathfinder with ADVI #
+# summary(w_d_matrix[, "pf"] / w_d_matrix[, "meanfield"])
+# summary(w_d_matrix[, "pf"] / w_d_matrix[, "fullrank"])
+# summary(w_d_matrix[, "pf"] / w_d_matrix[, "meanfield center"])
+# summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "meanfield"])
+# summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "fullrank"])
+# summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "meanfield center"])
+# 
+# ## one plot ##
+# summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "PhI"])
+# ratios <- c(w_d_matrix[, c("pf", "pf_20_IR", "PhI", "meanfield", 
+#                            "meanfield center", "fullrank")] / 
+#               w_d_matrix[, "pf_20_IR"])
+# ratios[ratios > 2^10] <- 2^10
+# w_d_dat = data.frame(ratios = ratios,
+#                      label = c(
+#                        rep("pathfinder", length(model_record)), 
+#                        rep("multi-path pathfinder", length(model_record)),
+#                        rep("Stan Phase I", length(model_record)),
+#                        rep("mean-field ADVI", length(model_record)),
+#                        rep("mean-field center", length(model_record)),
+#                        rep("dense ADVI", length(model_record))),
+#                      model = rep(pn[model_record], 6))#6))
+# 
+# p_w_d_compar <- w_d_dat %>% 
+#   ggplot(aes(y = model, #reorder(model, ratios, FUN = mean), 
+#              x = ratios, color = label, shape = label)) + 
+#   geom_point(size = 2) +
+#   scale_x_continuous(trans = 'log2',
+#                      limits = c(1/4, 1024),
+#                      breaks = c(1/4, 1/2, 1, 2, 4, 
+#                                 8, 16, 32, 64, 128, 256, 512, 1024),
+#                      labels = c("1/4", 
+#                                 "1/2", "1", "2", "4", "8", 
+#                                 "16", "32", "64", "128", 
+#                                 "256", "512", ">=1024")) + 
+#   ylab("") + xlab("scaled Wasserstein distance") + 
+#   theme_bw(base_size = 12)  +
+#   theme(legend.position="top", legend.title = element_blank()) #+
+# #theme(legend.position = "none") 
+# 
+# width <- 12.0
+# height <- 8.0
+# pointsize <- 16
+# 
+# setEPS()
+# postscript("../pics/phI_adapt_default/W_d_compar_100_each_2.eps",  #_resam_each
+#            width = width, height = height)
+# print(p_w_d_compar)
+# dev.off()
 
-# check pathfinder vs phase I warmup
-pf_vs_phI <- (w_d_matrix[, "pf"] / w_d_matrix[, "PhI"])
-summary(pf_vs_phI)
-quantile(pf_vs_phI, c(0.05, 0.5, 0.95))
-
-pf_vs_phI <- (w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "PhI"])
-summary(pf_vs_phI)
-quantile(pf_vs_phI, c(0.05, 0.5, 0.95))
-table(pf_vs_phI<1.2)
-max(pf_vs_phI)
-
-## rank methods ##
-rank_score <- apply(w_d_matrix[, c("pf", "pf_20_IR", "PhI", "meanfield", 
-                                   "meanfield center", "fullrank")], 1, 
-                    f <- function(x){order(order(x))})
-table(rank_score[2, ]==1)
-table(rank_score[2, ]==2)
-table(rank_score[2, ]<4)
-table(rank_score[1, ]==1)
-table(rank_score[3, ]<3)
-rowSums(rank_score)
-round(rowMeans(rank_score), 1)
-
-# faceted rank histograms
-rank_dat = data.frame(rank = c(rank_score),
-                      label = rep(c("pathfinder", 
-                                    "multi-path pathfinder", 
-                                    "Stan Phase I",
-                                    "mean-field ADVI",
-                                    "mean-field center",
-                                    "dense ADVI"), length(model_record)))
-
-p_rank <- ggplot(rank_dat, aes(x = rank)) + geom_histogram(bins = 6) + 
-  facet_wrap(~label)
-p_rank
-width <- 8.0
-height <- 4.0
-setEPS()
-postscript("../pics/phI_adapt_default/rank_test.eps",  #_resam_each
-           width = width, height = height)
-print(p_rank)
-dev.off()
-
-## rank comparision ##
-rank_M <- matrix(NA, 6, 6)
-method_names <- c("pf", "pf_20_IR", "PhI", "meanfield", 
-                  "meanfield center", "fullrank")
-for(A in 1:6){
-  for(B in 1:6){
-    rank_M[A, B] <- sum(w_d_matrix[, method_names[A]] < 
-                          w_d_matrix[, method_names[B]])
-  }
-}
-rownames(rank_M) <- c("pf <", "pf_20_IR <", "PhI <", "meanfield <", 
-                      "meanfield center <", "fullrank <")
-colnames(rank_M) <- c("pf", "pf_20_IR", "PhI", "meanfield", 
-                      "meanfield center", "fullrank")
-rank_M <- round(rank_M/49, 2)
-rank_M
-
-# compare pathfinder with ADVI #
-summary(w_d_matrix[, "pf"] / w_d_matrix[, "meanfield"])
-summary(w_d_matrix[, "pf"] / w_d_matrix[, "fullrank"])
-summary(w_d_matrix[, "pf"] / w_d_matrix[, "meanfield center"])
-summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "meanfield"])
-summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "fullrank"])
-summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "meanfield center"])
-
-## one plot ##
-summary(w_d_matrix[, "pf_20_IR"] / w_d_matrix[, "PhI"])
-ratios <- c(w_d_matrix[, c("pf", "pf_20_IR", "PhI", "meanfield", 
-                           "meanfield center", "fullrank")] / 
-              w_d_matrix[, "pf_20_IR"])
-ratios[ratios > 2^10] <- 2^10
-w_d_dat = data.frame(ratios = ratios,
-                     label = c(
-                       rep("pathfinder", length(model_record)), 
-                       rep("multi-path pathfinder", length(model_record)),
-                       rep("Stan Phase I", length(model_record)),
-                       rep("mean-field ADVI", length(model_record)),
-                       rep("mean-field center", length(model_record)),
-                       rep("dense ADVI", length(model_record))),
-                     model = rep(pn[model_record], 6))#6))
-
-p_w_d_compar <- w_d_dat %>% 
-  ggplot(aes(y = model, #reorder(model, ratios, FUN = mean), 
-             x = ratios, color = label, shape = label)) + 
-  geom_point(size = 2) +
-  scale_x_continuous(trans = 'log2',
-                     limits = c(1/4, 1024),
-                     breaks = c(1/4, 1/2, 1, 2, 4, 
-                                8, 16, 32, 64, 128, 256, 512, 1024),
-                     labels = c("1/4", 
-                                "1/2", "1", "2", "4", "8", 
-                                "16", "32", "64", "128", 
-                                "256", "512", ">=1024")) + 
-  ylab("") + xlab("scaled Wasserstein distance") + 
-  theme_bw(base_size = 12)  +
-  theme(legend.position="top", legend.title = element_blank()) #+
-#theme(legend.position = "none") 
-
-width <- 12.0
-height <- 8.0
-pointsize <- 16
-
-setEPS()
-postscript("../pics/phI_adapt_default/W_d_compar_100_each_2.eps",  #_resam_each
-           width = width, height = height)
-print(p_w_d_compar)
-dev.off()
 
 ## 100 for each ##
-load("../results/wasserstein_100_default.RData")
+load("../results/wasserstein_phI.RData")
+load("../results/wasserstein_100_default_W1_WR_updat.RData")
+M = 100
 
 # meanfield ADVI #
 ratio_M_wd_mf <- (apply(W_d_100_ADVI_mf, 2, f <- function(x){quantile(x, 0.5)})/
@@ -182,7 +186,6 @@ ratio_M_wd_mf_IR <- (apply(W_d_100_ADVI_mf, 2, f <- function(x){quantile(x, 0.5)
                        apply(W_d_100_pf_IR, 2, f <- function(x){quantile(x, 0.5)}))
 mean(ratio_M_wd_mf_IR)
 mean_M_wd_mf_IR <- colMeans(W_d_100_ADVI_mf) / colMeans(W_d_100_pf_IR)
-
 
 # dense ADVI #
 ratio_M_wd_fr <- (apply(W_d_100_ADVI_fr, 2, f <- function(x){quantile(x, 0.5)})/
@@ -205,58 +208,127 @@ table((ratio_M_wd_fr > 2) & (ratio_M_wd_mf > 2))
 table((ratio_M_wd_fr < 0.5) & (ratio_M_wd_mf < 0.5))
 
 table((mean_M_wd_fr > 2) & (mean_M_wd_mf > 2) & (mean_M_wd_fr_IR > 2) & 
-        (mean_M_wd_mf_IR > 2)) # 31
+        (mean_M_wd_mf_IR > 2)) # 34
 table((mean_M_wd_fr < 0.5) & (mean_M_wd_mf < 0.5))
 
+# check Stan Phase I #
+table((w_d_phI / apply(W_d_100_pf, 2, f <- function(x){quantile(x, 0.5)})) > 2)
+table((w_d_phI / apply(W_d_100_pf, 2, f <- function(x){quantile(x, 0.5)})) < 0.5)
+
+
 # check model bball_drive_event_0-hmm_drive_0 #
+median(W_d_100_ADVI_mf[, 3]) / median(W_d_100_pf[, 3])
 mean(W_d_100_pf_IR[, 3]) / mean(W_d_100_pf[, 3])
 
 w_d_median_pf_IR <- rep(apply(W_d_100_pf_IR, 2, median), each = M)
 apply(W_d_100_pf / w_d_median_pf_IR, 2, median)
 apply(W_d_100_ADVI_mf / w_d_median_pf_IR, 2, median)
 apply(W_d_100_ADVI_fr / w_d_median_pf_IR, 2, median)
-w_d_scaled = c(c(W_d_100_pf_IR / w_d_median_pf_IR),
-               c(W_d_100_pf / w_d_median_pf_IR), 
-               c(W_d_100_ADVI_mf / w_d_median_pf_IR), 
-               c(W_d_100_ADVI_fr / w_d_median_pf_IR))
+
+w_d_median_pf <- rep(apply(W_d_100_pf, 2, median), each = M)
+w_d_median_phI <- rep(w_d_phI, each = M)
+w_d_scaled = c(#c(W_d_100_pf_IR / w_d_median_pf),
+               c(W_d_100_pf / w_d_median_pf), 
+               c(W_d_100_ADVI_mf / w_d_median_pf), 
+               c(W_d_100_ADVI_fr / w_d_median_pf))
 w_d_scaled[w_d_scaled >= 2^12] <- 2^12
 df <- data.frame(w_d = w_d_scaled,
-                 model = rep(rep(pn[model_record], each = M), 4),
-                 type = rep(c("multi-path pathfinder", "pathfinder", 
-                              "mean-field ADVI", "dense ADVI"), 
+                 model = rep(rep(pn[model_record], each = M), 3),
+                 type = rep(c(#"multi-path pathfinder", 
+                              1, #"pathfinder", 
+                              2, #"mean-field ADVI", 
+                              3 #"dense ADVI"
+                              ), 
                             each = length(model_record)*M))
+df$type <- factor(df$type, levels = 1:3,
+                     labels = c("pathfinder", "mean-field ADVI",
+                                         "dense ADVI"))
 
-
-# w_d_PhI_scaled <- c(w_d_summary[, "PhI"] / w_d_median_pf_IR)
-# w_d_point = data.frame(w_d_PhI_scaled = w_d_PhI_scaled,
-#                        model = pn[model_record], 
-#                        point = rep("Stan Phase I", length(model_record)))
+w_d_PhI_scaled <- c(w_d_phI / apply(W_d_100_pf, 2, median))
+w_d_point = data.frame(w_d_PhI_scaled = w_d_PhI_scaled,
+                       model = pn[model_record],
+                       point = rep("Stan Phase I", length(model_record)))
 
 width <- 12.0
 height <- 13.0
 setEPS()
-postscript("../pics/phI_adapt_default/W_d_box_compar_100_each.eps",  #_resam_each
+# postscript("../pics/phI_adapt_default/W_d_box_compar_100_each.eps",  #_resam_each
+#            width = width, height = height)
+postscript("../pics/phI_adapt_default/W_d_box_compar_100_VI.eps",  #_resam_each
            width = width, height = height)
 p_box_compar <- df %>%
   ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
              x = w_d, color = type)) + 
   geom_boxplot(outlier.size = 0.1) + 
-  # geom_point(aes(y = model, x = w_d_PhI_scaled, shape = point), 
-  #            data = w_d_point, size = 2, inherit.aes=FALSE) +
-  # scale_shape_manual(values=c(23)) + 
-  #scale_fill_manual(values = cbbPalette) +
-  scale_colour_manual(values=cbbPalette) + 
+  geom_point(aes(y = model, x = w_d_PhI_scaled, shape = point), 
+             color = "#009E73",
+             data = w_d_point, size = 2, inherit.aes=FALSE) +
+  scale_shape_manual(values=c(17)) +
+  # scale_x_continuous(trans = 'log10',
+  #                    limits = c(1/100, 2^12),
+  #                    breaks = c(1/100, 1/10, 1, 10, 100, 1000, 2^12),
+  #                    labels = c("1/100", "1/10", "1", "10", 
+  #                               "100", "1000", ">4096")) +
   scale_x_continuous(trans = 'log2',
                      limits = c(1/32, 2^12),
-                     breaks = c(1/32, 1/16, 1/8, 1/4, 1/2, 1, 2, 4, 
-                                8, 16, 32, 64, 128, 256, 512, 1024,
-                                2^11, 2^12),
-                     labels = c("1/32", "1/16", "1/8", "1/4", 
-                                "1/2", "1", "2", "4", "8", 
-                                "16", "32", "64", "128", 
-                                "256", "512", "1024", "2048", ">4096")) + 
-  ylab("") + xlab("") + #xlab("calls to log density and gradient") + 
+                     breaks = c(1/32, 1/16, 1/8, 1/4,
+                                1/2, 1, 2, 4, 8, 16, 32, 64, 128, 256,
+                                512, 1024, 2^11, 2^12),
+                     labels = c("1/32", "1/16",
+                                "1/8", "1/4", "1/2", "1", "2", "4", "8",
+                                "16", "32", "64", "128",
+                                "256", "512", "1024", "2048", ">4096")) +
+  scale_colour_manual(values=c("#56B4E9", "#E69F00", "#000000")) +  #cbbPalette
+  ylab("") + xlab("scaled 1-Wasserstein distance") + #xlab("calls to log density and gradient") + 
   theme_bw(base_size = 12 )+
+  theme(legend.position="top", legend.title = element_blank()) 
+print(p_box_compar)
+dev.off()
+
+## compare single- & multi-path Pathfinder and Stan phase I ##
+w_d_scaled = c(c(W_d_100_pf_IR / w_d_median_pf),
+  c(W_d_100_pf / w_d_median_pf))
+
+w_d_scaled[w_d_scaled >= 2^12] <- 2^12
+df <- data.frame(w_d = w_d_scaled,
+                 model = rep(rep(pn[model_record], each = M), 2),
+                 type = rep(c("multi-path pathfinder", "pathfinder"), 
+                   each = length(model_record)*M))
+
+
+w_d_PhI_scaled <- c(w_d_phI / apply(W_d_100_pf, 2, median))
+w_d_point = data.frame(w_d_PhI_scaled = w_d_PhI_scaled,
+                       model = pn[model_record],
+                       point = rep("Stan Phase I", length(model_record)))
+
+w_d_PhI_scaled_2 <- c(w_d_phI / apply(W_d_100_pf_IR, 2, median))
+table(w_d_PhI_scaled > 2)
+table(w_d_PhI_scaled < 0.5)
+
+width <- 12.0
+height <- 13.0
+setEPS()
+postscript("../pics/phI_adapt_default/W_d_box_compar_100_pf.eps",  #_resam_each
+           width = width, height = height)
+p_box_compar <- df %>%
+  ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
+             x = w_d, color = type)) + 
+  geom_boxplot(outlier.size = 0.1) + 
+  geom_point(aes(y = model, x = w_d_PhI_scaled, shape = point), 
+             color = "#009E73",
+             data = w_d_point, size = 2, inherit.aes=FALSE) +
+  scale_shape_manual(values=c(17)) +
+  #geom_vline(xintercept=1, color = "red", size=0.5)+
+  scale_colour_manual(values=c("#CC79A7", "#56B4E9")) + 
+  scale_x_continuous(trans = 'log2',
+                     limits = c(1/32, 128),
+                     breaks = c(1/32, 1/16, 1/8, 1/4,
+                                1/2, 1, 2, 4, 8, 16, 32, 64, 128),
+                     labels = c("1/32", "1/16",
+                                "1/8", "1/4", "1/2", "1", "2", "4", "8",
+                                "16", "32", "64", "128")) + 
+  ylab("") + xlab("scaled 1-Wasserstein distance") + #xlab("calls to log density and gradient") + 
+  theme_bw(base_size = 12)+
   theme(legend.position="top", legend.title = element_blank()) 
 print(p_box_compar)
 dev.off()
@@ -265,7 +337,8 @@ dev.off()
 ## computational cost comparision ##
 load("../results/lp_posteriordb_phI_adapt_default.RData") # Pathfinder #_resam_all #_resam_each
 load("../results/PhI_100_h10.RData")
-load("../results/ADVI_100.RData")
+load("../results/ADVI_100_updat.RData")
+load("../results/multi_pf_samples_default.RData")
 
 pathfinder_fn_call <- 
   sapply(lp_opath, f <- function(x){
@@ -274,13 +347,12 @@ pathfinder_gr_call <-
   sapply(lp_opath, f <- function(x){
     sapply(x$opath, g <- function(z){sum(z$gr_call)}) } )
 
-
 summary(colSums(PhI_leapfrog_counts) / colSums(pathfinder_fn_call))
 summary(colSums(PhI_leapfrog_counts) / colSums(pathfinder_gr_call))
 table((colSums(PhI_leapfrog_counts) / colSums(pathfinder_gr_call)) > 100)
-summary(colSums(calls_lp_mean) / colSums(pathfinder_fn_call))
+summary(colSums(calls_lp_mean + calls_gr_mean) / colSums(pathfinder_fn_call))
 summary(colSums(calls_gr_mean) / colSums(pathfinder_gr_call))
-summary(colSums(calls_lp_full) / colSums(pathfinder_fn_call))
+summary(colSums(calls_lp_full + calls_gr_full) / colSums(pathfinder_fn_call))
 summary(colSums(calls_gr_full) / colSums(pathfinder_gr_call))
 
 summary(calls_lp_mean / colMeans(pathfinder_fn_call))
@@ -290,21 +362,24 @@ summary(calls_gr_full / colMeans(pathfinder_gr_call))
 
 
 df <- data.frame(n_counts = c(c(pathfinder_fn_call), 
-                              c(PhI_leapfrog_counts),
-                              c(calls_lp_mean), c(calls_lp_full)),
+                              c(calls_lp_mean + calls_gr_mean), 
+                              c(calls_lp_full + calls_gr_full),
+                              c(PhI_leapfrog_counts)),
                  model = rep(rep(pn[model_record], each = M), 4),
-                 type = rep(c("Pathfinder", "Stan Phase I", 
-                              "mean-field ADVI", "dense ADVI"), 
+                 type = rep(1:4, 
                             each = M * length(model_record)))
 
+df$type <- factor(df$type, levels = 1:4, 
+                  labels = c("Pathfinder", "mean-field ADVI", 
+                             "dense ADVI", "Stan Phase I"))
 p_lp_compar <- df %>%
   ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
              x = n_counts, color = type)) + 
   geom_boxplot(outlier.size = 0.1) +
-  scale_colour_manual(values = cbbPalette) +
+  scale_colour_manual(values = c("#56B4E9", "#E69F00", "#000000", "#009E73")) + #cbbPalette
   scale_x_log10(breaks=c(10, 1e2, 1e3, 1e4, 5e4), 
                 labels = c("10", "100", "1000", "10,000", "50,000")) + 
-  ylab("") + xlab("") + #xlab("calls to lp__") + 
+  ylab("") + xlab("count of log density evaluation ") + #xlab("calls to lp__") + 
   theme_bw(base_size = 12)+
   theme(legend.position="top", legend.title = element_blank())   
 
@@ -318,21 +393,24 @@ print(p_lp_compar)
 dev.off()
 
 df <- data.frame(n_counts = c(c(pathfinder_gr_call), 
-                              c(PhI_leapfrog_counts),
-                              c(calls_gr_mean), c(calls_gr_full)),
+                              c(calls_gr_mean), c(calls_gr_full),
+                              c(PhI_leapfrog_counts)),
                  model = rep(rep(pn[model_record], each = M), 4),
-                 type = rep(c("Pathfinder", "Stan Phase I", 
-                              "mean-field ADVI", "dense ADVI"), 
+                 type = rep(1:4, 
                             each = M * length(model_record)))
+
+df$type <- factor(df$type, levels = 1:4, 
+                  labels = c("Pathfinder", "mean-field ADVI", 
+                             "dense ADVI", "Stan Phase I"))
 
 p_gr_compar <- df %>%
   ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
              x = n_counts, color = type)) + 
   geom_boxplot(outlier.size = 0.1) +
-  scale_colour_manual(values = cbbPalette) +
+  scale_colour_manual(values = c("#56B4E9", "#E69F00", "#000000", "#009E73")) +
   scale_x_log10(breaks=c(10, 1e2, 1e3, 1e4, 5e4), 
                 labels = c("10", "100", "1000", "10,000", "50,000")) + 
-  ylab("") + xlab("") + #xlab("calls to lp__") + 
+  ylab("") + xlab("count of log density gradient evaluation") + #xlab("calls to lp__") + 
   theme_bw(base_size = 12)+
   theme(legend.position="top", legend.title = element_blank())   
 
@@ -347,9 +425,9 @@ dev.off()
 
 ## sensitivity test ##
 ## 100 for each ##
-load("../results/wasserstein_100_default.RData")
+load("../results/wasserstein_100_default_W1_WR.RData")
 W_d_100_pf_default <- W_d_100_pf
-load("../results/wasserstein_100_sen.RData")
+load("../results/wasserstein_100_sen_W1.RData")
 
 
 ## Number of monte carlo samples in ELBO estimation ##
@@ -380,10 +458,11 @@ range(w_d_scaled)
 w_d_scaled[w_d_scaled >= 2^12] <- 2^12
 df <- data.frame(w_d = w_d_scaled,
                  model = rep(rep(pn[model_record], each = M), 2),
-                 type = rep(c("Lmax = 1000, tol = 1e-13, K = 30, J = 6", 
-                              "Lmax = 1000, tol = 1e-13, K = 5, J = 6"), 
+                 type = rep(1:2, 
                             each = length(model_record)*M))
-
+df$type <- factor(df$type, levels = 1:2, 
+                  labels = c("Lmax = 1000, tol = 1e-13, K = 30, J = 6", 
+                             "Lmax = 1000, tol = 1e-13, K = 5, J = 6"))
 
 width <- 12.0
 height <- 8.0
@@ -394,7 +473,7 @@ p_box_compar <- df %>%
   ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
              x = w_d, color = type)) + 
   geom_boxplot(outlier.size = 0.1) +
-  scale_colour_manual(values=cbbPalette) + 
+  scale_colour_manual(values = c("#000000", "#E69F00")) +
   scale_x_continuous(trans = 'log2',
                      limits = c(1/16, 128),
                      breaks = c(1/16, 1/8, 1/4, 1/2, 1, 2, 4, 
@@ -402,7 +481,7 @@ p_box_compar <- df %>%
                      labels = c("1/16", "1/8", "1/4", 
                                 "1/2", "1", "2", "4", "8", 
                                 "16", "32", "64", "128")) + 
-  ylab("") + xlab("") + #xlab("calls to log density and gradient") + 
+  ylab("") + xlab("scaled 1-Wasserstein distance") + #xlab("calls to log density and gradient") + 
   theme_bw(base_size = 12 )+
   theme(legend.position="top", legend.title = element_blank()) 
 print(p_box_compar)
@@ -414,9 +493,12 @@ w_d_scaled = c(c(W_d_100_pf_short_L / w_d_median_pf),
 range(w_d_scaled)
 df <- data.frame(w_d = w_d_scaled,
                  model = rep(rep(pn[model_record], each = M), 2),
-                 type = rep(c("Lmax = 200, tol = 1e-8, K = 5, J = 6",  
-                              "Lmax = 1000, tol = 1e-13, K = 5, J = 6"), 
+                 type = rep(1:2, 
                             each = length(model_record)*M))
+df$type <- factor(df$type, levels = 1:2, 
+                  labels = c("Lmax = 200, tol = 1e-8, K = 5, J = 6",  
+                             "Lmax = 1000, tol = 1e-13, K = 5, J = 6"))
+
 
 
 width <- 12.0
@@ -428,7 +510,7 @@ p_box_compar <- df %>%
   ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
              x = w_d, color = type)) + 
   geom_boxplot(outlier.size = 0.1) +
-  scale_colour_manual(values=cbbPalette) + 
+  scale_colour_manual(values = c("#000000", "#E69F00")) +
   scale_x_continuous(trans = 'log2',
                      limits = c(1/16, 128),
                      breaks = c(1/16, 1/8, 1/4, 1/2, 1, 2, 4, 
@@ -436,7 +518,7 @@ p_box_compar <- df %>%
                      labels = c("1/16", "1/8", "1/4", 
                                 "1/2", "1", "2", "4", "8", 
                                 "16", "32", "64", "128")) + 
-  ylab("") + xlab("") + #xlab("calls to log density and gradient") + 
+  ylab("") + xlab("scaled 1-Wasserstein distance") + #xlab("calls to log density and gradient") + 
   theme_bw(base_size = 12 )+
   theme(legend.position="top", legend.title = element_blank()) 
 print(p_box_compar)
@@ -445,22 +527,26 @@ dev.off()
 ## history size ##
 mean((apply(W_d_100_pf_long_hist, 2, f <- function(x){quantile(x, 0.5)}) / 
         apply(W_d_100_pf_default, 2, f <- function(x){quantile(x, 0.5)}))[c(-5, -8)])
-# 0.9496337
+# 0.952691
 median((apply(W_d_100_pf_long_hist, 2, f <- function(x){quantile(x, 0.5)}) / 
           apply(W_d_100_pf_default, 2, f <- function(x){quantile(x, 0.5)}))[c(-5, -8)])
-# 0.9541166
+# 0.9373797
 range((apply(W_d_100_pf_long_hist, 2, f <- function(x){quantile(x, 0.5)}) / 
          apply(W_d_100_pf_default, 2, f <- function(x){quantile(x, 0.5)}))[c(-5, -8)])
-# 0.8065852 1.4026032
+# 0.7728589 1.4004949
 
 w_d_scaled = c(c(W_d_100_pf_long_hist / w_d_median_pf), 
                c(W_d_100_pf_default / w_d_median_pf))
 range(w_d_scaled)
 df <- data.frame(w_d = w_d_scaled,
                  model = rep(rep(pn[model_record], each = M), 2),
-                 type = rep(c("Lmax = 1000, tol = 1e-13, K = 5, J = 60",  
-                              " Lmax = 1000, tol = 1e-13, K = 5, J = 6"), 
-                            each = length(model_record)*M))
+                 type = rep(1:2, each = length(model_record)*M))
+
+df$type <- factor(df$type, levels = 1:2, 
+                  labels = c("Lmax = 1000, tol = 1e-13, K = 5, J = 60",  
+                             "Lmax = 1000, tol = 1e-13, K = 5, J = 6"))
+
+
 
 width <- 12.0
 height <- 8.0
@@ -471,7 +557,7 @@ p_box_compar <- df %>%
   ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
              x = w_d, color = type)) + 
   geom_boxplot(outlier.size = 0.1) +
-  scale_colour_manual(values=cbbPalette) + 
+  scale_colour_manual(values = c("#000000", "#E69F00")) +
   scale_x_continuous(trans = 'log2',
                      limits = c(1/16, 128),
                      breaks = c(1/16, 1/8, 1/4, 1/2, 1, 2, 4, 
@@ -479,15 +565,15 @@ p_box_compar <- df %>%
                      labels = c("1/16", "1/8", "1/4", 
                                 "1/2", "1", "2", "4", "8", 
                                 "16", "32", "64", "128")) + 
-  ylab("") + xlab("") + #xlab("calls to log density and gradient") + 
+  ylab("") + xlab("scaled 1-Wasserstein distance") + #xlab("calls to log density and gradient") + 
   theme_bw(base_size = 12 )+
   theme(legend.position="top", legend.title = element_blank()) 
 print(p_box_compar)
 dev.off()
 
 ## sensitivity test for I ##
-load("../results/wasserstein_100_default.RData")
-load("../results/wasserstein_100_sen_I.RData")
+load("../results/wasserstein_100_default_W1_WR.RData")
+load("../results/wasserstein_100_sen_I_W1_WR.RData")
 
 ratio_M_wd_I5 <- (apply(W_d_100_pf_I5, 2, f <- function(x){quantile(x, 0.5)})/
                     apply(W_d_100_pf_IR, 2, f <- function(x){quantile(x, 0.5)}))
@@ -526,16 +612,17 @@ summary(apply(W_d_100_pf_I40, 2, var) / apply(W_d_100_pf_IR, 2, var))
 range(apply(W_d_100_pf_IR, 2, var)/apply(W_d_100_pf_I40, 2, var))
 
 
-w_d_scaled = c(c(W_d_100_pf_I5 / w_d_median_pf_IR), 
+w_d_scaled = c(c(W_d_100_pf_I40 / w_d_median_pf_IR), 
                c(W_d_100_pf_IR / w_d_median_pf_IR),
-               c(W_d_100_pf_I40 / w_d_median_pf_IR))
+               c(W_d_100_pf_I5 / w_d_median_pf_IR))
 w_d_scaled[w_d_scaled >= 2^12] <- 2^12
 df <- data.frame(w_d = w_d_scaled,
                  model = rep(rep(pn[model_record], each = M), 3),
-                 type = rep(c("I = 5", "I = 20", "I = 40"), 
-                            each = length(model_record)*M))
+                 type = rep(1:3, each = length(model_record)*M))
+df$type <- factor(df$type, levels = 1:3, 
+                  labels = c("I = 40", "I = 20", "I = 5"))
 
-df$type <- factor(df$type , levels=c("I = 5", "I = 20", "I = 40"))
+
 
 width <- 12.0
 height <- 12.0
@@ -546,7 +633,8 @@ p_box_compar <- df %>%
   ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
              x = w_d, color = type)) + 
   geom_boxplot(outlier.size = 0.1) + 
-  scale_colour_manual(values=cbbPalette) + 
+  scale_colour_manual(values = c("#000000", "#E69F00", "#009E73")) +
+  #scale_colour_manual(values=cbbPalette) + 
   scale_x_continuous(trans = 'log2',
                      limits = c(1/4, 16),
                      breaks = c(1/4, 1/2, 1, 2, 4, 
@@ -554,7 +642,7 @@ p_box_compar <- df %>%
                      labels = c("1/4", 
                                 "1/2", "1", "2", "4", "8", 
                                 "16")) + 
-  ylab("") + xlab("") + #xlab("calls to log density and gradient") + 
+  ylab("") + xlab("scaled 1-Wasserstein distance") + #xlab("calls to log density and gradient") + 
   theme_bw(base_size = 12 )+
   theme(legend.position="top", legend.title = element_blank()) 
 print(p_box_compar)
@@ -640,7 +728,7 @@ postscript("../pics/phI_adapt_default/cost_gr_sens.eps",  #_resam_each
 print(p_gr_compar)
 dev.off()
 
-
+## case studies from posteriordb in Section 3.4 ##
 ## function for extract optims and inits ##
 get_init_optim <- function(ind){
   lp_ind = ncol(lp_opath[[ind]]$opath[[1]]$y)
@@ -679,7 +767,7 @@ get_opt_tr <- function(opath){
 }
 
 # 8 school centered #
-## run main_pf with i = 15, seed_list = 1:20, sample with PSIS WOR for 20 inits
+## run main_pf with i = 15, seed_list = 1:20, sample with PSIS WR for 100 samples
 # run wasserstain_check with i = 15 and generate the plots
 # then
 ## run main_pf.R with init_bound = 15.0 and generate the plots
@@ -712,7 +800,7 @@ p_check <- ggplot(dta_check, aes(x=x, y=y) ) +
   )
 
 p_check
-ggsave("8-school_points22.eps", #"8-school_opt_tr22.eps"
+ggsave("8-school_points.eps", #"8-school_opt_tr22.eps"
        plot = p_check,
        device = cairo_ps,
        path = "../pics/phI_adapt_default/",
@@ -726,7 +814,7 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   geom_point(data = dta_opt, 
              aes(x = optim_x, y = optim_y, group = tr_id, 
                  color = optim_ind, alpha = 0.5), size = 1) +
-  geom_line(data = dta_opt, 
+  geom_path(data = dta_opt, 
             aes(x = optim_x, y = optim_y, group = tr_id, 
                 color = optim_ind, alpha = 0.5)) +
   scale_color_gradient(low="white", high="orange") +
@@ -736,7 +824,7 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   ) 
 p_check1
 
-ggsave("8-school_opt_tr22.eps", #"8-school_opt_tr22.eps"
+ggsave("8-school_opt_tr.eps", #"8-school_opt_tr22.eps"
        plot = p_check1,
        device = cairo_ps,
        path = "../pics/phI_adapt_default/",
@@ -744,7 +832,7 @@ ggsave("8-school_opt_tr22.eps", #"8-school_opt_tr22.eps"
 
 
 # multimodality #
-## run main_pf with i = 3, seed_list = 1:20, sample with PSIS WOR for 20 inits
+## run main_pf with i = 3, seed_list = 1:20, sample with PSIS WR for 100 approximate draws
 # run wasserstain_check with i = 3 and generate the plots
 opt_tr_res <- get_opt_tr(opath)
 check_dim <- c(4, 6)  
@@ -792,7 +880,7 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   geom_point(data = dta_opt, 
              aes(x = optim_x, y = optim_y, group = tr_id, 
                  color = optim_ind), size = 1) +
-  geom_line(data = dta_opt, 
+  geom_path(data = dta_opt, 
             aes(x = optim_x, y = optim_y, group = tr_id, 
                 color = optim_ind)) +
   scale_color_gradient(low="white", high="orange") +
@@ -877,7 +965,7 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   geom_point(data = dta_opt,
              aes(x = optim_x, y = optim_y, group = tr_id,
                  color = optim_ind), size = 1) +
-  geom_line(data = dta_opt,
+  geom_path(data = dta_opt,
             aes(x = optim_x, y = optim_y, group = tr_id,
                 color = optim_ind)) +
   scale_color_gradient(low="white", high="orange") +
@@ -938,7 +1026,7 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   geom_point(data = dta_opt, 
              aes(x = optim_x, y = optim_y, group = tr_id, 
                  color = optim_ind), size = 1) +
-  geom_line(data = dta_opt, 
+  geom_path(data = dta_opt, 
             aes(x = optim_x, y = optim_y, group = tr_id, 
                 color = optim_ind)) +
   scale_color_gradient(low="white", high="orange") +
@@ -981,7 +1069,7 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   geom_point(data = dta_opt, 
              aes(x = optim_x, y = optim_y, group = tr_id, 
                  color = optim_ind), size = 1) +
-  geom_line(data = dta_opt, 
+  geom_path(data = dta_opt, 
             aes(x = optim_x, y = optim_y, group = tr_id, 
                 color = optim_ind)) +
   scale_color_gradient(low="white", high="orange") +
@@ -1009,7 +1097,7 @@ opath <- opt_path_stan_init_parallel(
   init_ls, mc.cores, model, data, init_bound = 2.0, 
   N1, N_sam_DIV, N_sam, factr_tol, lmm, seed_list)
 print(proc.time() - t)
-pick_samples <- Imp_Resam_WOR(opath, n_inits = 20, seed = 1)
+pick_samples <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
 
 opt_tr_res <- get_opt_tr(opath)
 check_dim <- c(1, 2)# c(1, 2) #c(43, 44) #c(45, 46) #  c(3, 4)
@@ -1038,7 +1126,7 @@ p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
   geom_point(data = dta_opt, 
              aes(x = optim_x, y = optim_y, group = tr_id, 
                  color = optim_ind), size = 1) +
-  geom_line(data = dta_opt, 
+  geom_path(data = dta_opt, 
             aes(x = optim_x, y = optim_y, group = tr_id, 
                 color = optim_ind)) +
   scale_color_gradient(low="white", high="orange") +
@@ -1054,9 +1142,22 @@ ggsave("32_opt_tr_12_2.eps",
        path = "../pics/phI_adapt_default/",
        width = 5.0, height = 5.0, units = "in")
 
+# check local hessian of points in high probability mass region
+library(numDeriv)
+posterior <- to_posterior(model, data)
+D <- get_num_upars(posterior)
+lp <- function(theta) -log_prob(posterior, theta, adjust_transform = TRUE, 
+                                gradient = TRUE)[1]
+
+H_l <- hessian(lp, ref_samples[10, ], method="Richardson")
+inv_H_l <- solve(H_l)
+diag(inv_H_l)[1:10]
+apply(ref_samples[, 1:10], 2, var)
+apply(pick_samples[1:10, ], 1, var)
+apply((ADVI_meanfield_draw_100[[32]][[10]][, 1:20]), 2, var)
 
 # non-Gaussian problem #
-## run main_pf with i = 18, seed_list = 1:20, sample with PSIS WOR for 20 inits
+## run main_pf with i = 18, seed_list = 1:20, sample with PSIS WR for 100 samples
 ## run wasserstain_check with i = 18 
 
 opt_tr_res <- get_opt_tr(opath)
@@ -1105,7 +1206,7 @@ p_check2 <- ggplot(dta_check, aes(x=x, y=y) ) +
   geom_point(data = dta_opt,
              aes(x = optim_x, y = optim_y, group = tr_id,
                  color = optim_ind), size = 1) +
-  geom_line(data = dta_opt,
+  geom_path(data = dta_opt,
             aes(x = optim_x, y = optim_y, group = tr_id,
                 color = optim_ind)) +
   scale_color_gradient(low="white", high="orange") +
@@ -1123,7 +1224,7 @@ ggsave("18_opt_tr.eps",
 
 ## codes for checking ##
 opt_tr_res <- get_opt_tr(opath)
-for(first_check in 1:6){
+for(first_check in 1:33){
   check_dim <- c(2 * first_check - 1, 2 * first_check)
   cat(check_dim, "\n")
   dta_sam <- data.frame(sam_x = pick_samples[check_dim[1], ],
@@ -1132,8 +1233,8 @@ for(first_check in 1:6){
   dta_check <- data.frame(x = ref_samples[, check_dim[1]],
                           y = ref_samples[, check_dim[2]])
   
-  dta_phI <- data.frame(x = PhaseI_last_draw[[32]][, check_dim[1]],
-                        y = PhaseI_last_draw[[32]][, check_dim[2]])
+  # dta_phI <- data.frame(x = PhaseI_last_draw[[32]][, check_dim[1]],
+  #                       y = PhaseI_last_draw[[32]][, check_dim[2]])
   
   dta_opt <- data.frame(
     optim_x = opt_tr_res$opt_tr[, check_dim[1]],
@@ -1151,7 +1252,7 @@ for(first_check in 1:6){
     geom_point(data = dta_opt,
                aes(x = optim_x, y = optim_y, group = tr_id,
                    color = optim_ind), size = 1) +
-    geom_line(data = dta_opt,
+    geom_path(data = dta_opt,
               aes(x = optim_x, y = optim_y, group = tr_id,
                   color = optim_ind)) +
     scale_color_gradient(low="white", high="orange") +
@@ -1169,7 +1270,7 @@ for(first_check in 1:6){
     geom_point(data = dta_opt,
                aes(x = optim_x, y = optim_y, group = tr_id,
                    color = optim_ind), size = 1) +
-    geom_line(data = dta_opt,
+    geom_path(data = dta_opt,
               aes(x = optim_x, y = optim_y, group = tr_id,
                   color = optim_ind)) +
     scale_color_gradient(low="white", high="orange") +
@@ -1182,41 +1283,51 @@ for(first_check in 1:6){
   print(p_check2)
   readline(prompt="Press [enter] to continue:")
   
-  p_phI <- ggplot(dta_check, aes(x=x, y=y) ) +
-    stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
-    scale_fill_distiller(palette=4, direction=-1) +
-    scale_x_continuous(expand = c(0, 0))+ #, limits = c(-2.5, 6)) +
-    scale_y_continuous(expand = c(0, 0))+ #, limits = c(-5, 1)) +
-    geom_point(data = dta_phI, aes(x=x, y=y), colour="red", size = 3) +
-    xlab("") + ylab("") +
-    theme(
-      legend.position='none'
-    )
-  
-  p_phI
+  # p_phI <- ggplot(dta_check, aes(x=x, y=y) ) +
+  #   stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
+  #   scale_fill_distiller(palette=4, direction=-1) +
+  #   scale_x_continuous(expand = c(0, 0))+ #, limits = c(-2.5, 6)) +
+  #   scale_y_continuous(expand = c(0, 0))+ #, limits = c(-5, 1)) +
+  #   geom_point(data = dta_phI, aes(x=x, y=y), colour="red", size = 3) +
+  #   xlab("") + ylab("") +
+  #   theme(
+  #     legend.position='none'
+  #   )
+  # p_phI
 }
 
 
 ## plots for wasserstein distance illustration ##
 ## run wasserstain_check with i = 6 
-# 0.03386512 vs  # 0.01372514
+# 0.03430658 vs  vs 0.00878406
 pick_samples_center <- ADVI_meanfield_center[[i]]
+#pick_samples_center <- t(ADVI_meanfield_draw_100[[i]][[1]])
 a_center = wpp(t(pick_samples_center), 
                mass = rep(1 / ncol(pick_samples_center), ncol(pick_samples_center)))
 b = wpp(ref_samples, mass = rep(1 / nrow(ref_samples), nrow(ref_samples)))
-w_d_c <- wasserstein(a_center, b, p = 2); w_d_c #0.03386512
+w_d_c <- wasserstein(a_center, b, p = 1); w_d_c #0.03430658
 
-pick_samples <- lp_opath[[i]]$pick_samples
+
+pick_samples_mf <- t(ADVI_meanfield_draw_100[[i]][[1]])
+a_mf = wpp(t(pick_samples_mf), 
+               mass = rep(1 / ncol(pick_samples_mf), ncol(pick_samples_mf)))
+w_d_mf <- wasserstein(a_mf, b, p = 1); w_d_mf #0.01676967
+
+
+pick_samples <- lp_opath[[i]]$opath[[1]]$DIV_save$repeat_draws   # pick_samples
 a = wpp(t(pick_samples), 
         mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
 b = wpp(ref_samples, mass = rep(1 / nrow(ref_samples), nrow(ref_samples)))
-w_d_pf <- wasserstein(a, b, p = 2); w_d_pf #0.01372514
+w_d_pf <- wasserstein(a, b, p = 1); w_d_pf #0.00878406
 
 check_dim <- c(1, 2)
 dta_sam <- data.frame(sam_x = pick_samples[check_dim[1], ],
                       sam_y = pick_samples[check_dim[2], ])
 dta_sam_center <- data.frame(sam_x = pick_samples_center[check_dim[1], ],
                              sam_y = pick_samples_center[check_dim[2], ])
+
+dta_sam_mf <- data.frame(sam_x = pick_samples_mf[check_dim[1], ],
+                             sam_y = pick_samples_mf[check_dim[2], ])
 
 dta_check <- data.frame(x = ref_samples[, check_dim[1]],
                         y = ref_samples[, check_dim[2]])
@@ -1259,5 +1370,83 @@ ggsave("6-dog_c.eps",
        device = cairo_ps,
        path = "../pics/phI_adapt_default/",
        width = 5.0, height = 5.0, units = "in")
+
+p_check_mf <- ggplot(dta_check, aes(x=x, y=y) ) +
+  stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
+  scale_fill_distiller(palette=4, direction=-1) +
+  scale_x_continuous(expand = c(0, 0), limits = c(-0.45, -0.25)) + 
+  scale_y_continuous(expand = c(0, 0), limits = c(-0.03, 0.16)) + 
+  geom_point(data = dta_sam_mf, aes(x=sam_x, y=sam_y),
+             colour="red", size = 3) +
+  xlab("") + ylab("") +
+  theme(
+    legend.position='none'
+  )
+
+p_check_mf
+ggsave("6-dog_mf.eps",
+       plot = p_check_mf,
+       device = cairo_ps,
+       path = "../pics/phI_adapt_default/",
+       width = 5.0, height = 5.0, units = "in")
+
+
+### plot of ELBO ###
+library(ggallin)
+load("../results/ADVI_100_updat.RData")
+load("../results/ELBO_pf.RData")
+M = 100
+
+# ELBO #
+
+ELBO_pf_median = apply(ELBO_pf, 2, f <- function(x)(median(x, na.rm = TRUE)))
+ELBO_pf_median[6] = median(ELBO_pf[, 6][is.finite(ELBO_pf[, 6])]) # correct the -Inf bug in Stan code for model dogs-dogs_log
+ELBO_ADVI_mf_median = apply(ELBO_ADVI_mf, 2, 
+                           f <- function(x)(median(x, na.rm = TRUE)))
+ELBO_ADVI_fr_median = apply(ELBO_ADVI_fr, 2, 
+                           f <- function(x)(median(x, na.rm = TRUE)))
+
+plot(ELBO_pf_median[-2], ELBO_ADVI_mf_median[-2])
+abline(a = 0, b = 1)
+
+ELBO_pf_shift = ELBO_pf - rep(ELBO_pf_median, each = M)
+ELBO_ADVI_mf_shift = ELBO_ADVI_mf - rep(ELBO_pf_median, each = M)
+ELBO_ADVI_fr_shift = ELBO_ADVI_fr - rep(ELBO_pf_median, each = M)
+ELBO = c(c(ELBO_ADVI_fr_shift), c(ELBO_ADVI_mf_shift), c(ELBO_pf_shift))
+ELBO[ELBO >= 100] <- 100
+ELBO[ELBO <= -10000] <- -10000
+na_id <- which(is.na(c(ELBO)))
+
+df <- data.frame(ELBO = ELBO[-na_id],
+                 model = rep(rep(pn[model_record], each = M), 3)[-na_id],
+                 type = rep(c(1, 2, 3), each = length(model_record)*M)[-na_id])
+df$type <- factor(df$type, levels = 1:3,
+                  labels = c("dense ADVI", "mean-field ADVI", "pathfinder"))
+
+width <- 12.0
+height <- 13.0
+setEPS()
+# postscript("../pics/phI_adapt_default/W_d_box_compar_100_each.eps",  #_resam_each
+#            width = width, height = height)
+postscript("../pics/phI_adapt_default/ELBO_compar_100_VI.eps",  #_resam_each
+           width = width, height = height)
+p_box_compar <- df %>%
+  ggplot(aes(y = model, #reorder(model, n_leapfrogs, FUN = median), 
+             x = ELBO, color = type)) + 
+  geom_boxplot(outlier.size = 0.1) +
+  scale_x_continuous(trans = pseudolog10_trans,
+    limits = c(-10000, 100),
+                     breaks = c(-10000, -1000, -100, -10,  0, 10, 100),
+                     labels = c("<-10000", "-1000", "-100", "-10", "0", 
+                                "10", ">100")) +
+  scale_colour_manual(values=c("#000000", "#E69F00", "#56B4E9")) +  #cbbPalette
+  ylab("") + xlab("shifted ELBO") + #xlab("calls to log density and gradient") + 
+  theme_bw(base_size = 12 )+
+  theme(legend.position="top", legend.title = element_blank()) 
+print(p_box_compar)
+dev.off()
+
+
+
 
 
