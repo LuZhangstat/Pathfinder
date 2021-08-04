@@ -1,6 +1,6 @@
 # adaptation
 
-This repository contains the code files of the analyses in "Pathfinder: Quasi-Newton posterior approximations alongoptimization paths"
+This repository contains the code files of the analyses in "Pathfinder: Parallel quasi-Newton variational inference"
 
 Roadmap
 ---------
@@ -26,7 +26,7 @@ Instructions
 ##### 100 repeats for experiments in Section 3
 1. Stan phase I: posteriordb_check/phaseI_check/main_100_PhI.R
 2. Pathfinder: posteriordb_check/phaseI_adapt_check/main_pf.R
-3. Robust ADVI: posteriordb_check/phaseI_ADVI/main_RVI_100.R
+3. ADVI: posteriordb_check/phaseI_ADVI/main_ADVI_100.R
 ##### Wasserstein distance computation and Plots for all experiements
 4. Wasserstein distance: posteriordb_check/wasserstain_check.R
 5. Plots: posteriordb_check/pic.R
