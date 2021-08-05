@@ -1,4 +1,4 @@
-# adaptation
+# Pathfinder
 
 This repository contains the code files of the analyses in "Pathfinder: Parallel quasi-Newton variational inference"
 
