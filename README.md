@@ -27,15 +27,16 @@ Instructions
 1. Stan phase I: posteriordb_check/phaseI_check/main_100_PhI.R
 2. Pathfinder: posteriordb_check/phaseI_adapt_check/main_pf.R
 3. ADVI: posteriordb_check/phaseI_ADVI/main_ADVI_100.R
+4. Laplace (in Appendix D): posteriordb_check/Laplace_check/main_laplace.R
 ##### Wasserstein distance computation and Plots for all experiements
-4. Wasserstein distance: posteriordb_check/wasserstain_check.R
-5. Plots: posteriordb_check/pic.R
+5. Wasserstein distance: posteriordb_check/wasserstain_check.R
+6. Plots: posteriordb_check/pic.R
 ##### Examples in Section 3.4
-6. 100-dimensional Neal's Funnel: example/funnel100/funnel100.R
-7. Ovarian example: example/ovarian/ovarian_test.R
-8. Mcycle_gp_accel_gp: example/mcycle_gp/mcycle_gp.R
+7. 100-dimensional Neal's Funnel: example/funnel100/funnel100.R
+8. Ovarian example: example/ovarian/ovarian_test.R
+9. Mcycle_gp_accel_gp: example/mcycle_gp/mcycle_gp.R
 ##### Birthday example in Section 3.5
-9. example/Birthdays/model6_test.R
+10. example/Birthdays/model6_test.R
 
 
 Authors
