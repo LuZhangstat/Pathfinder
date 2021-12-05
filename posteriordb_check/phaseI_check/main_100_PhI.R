@@ -57,7 +57,7 @@ for(i in 49:49){ #20 length(model_record)
   #                 basename = paste0(modelname, ".stan"))
   file <- file.path(getwd(), "modelcode", paste0(modelname, ".stan"))
   mod <- cmdstan_model(file)
-  
+  t <- proc.time()
   ###  random inits  ###
   suppressWarnings(
     fit <- mod$sample(
@@ -74,6 +74,7 @@ for(i in 49:49){ #20 length(model_record)
       show_messages = FALSE,
       sig_figs = 18
     ))
+  print(proc.time() - t)
   p1 <- mcmc_trace(fit$draws("lp__", inc_warmup = TRUE)[60:75, ,], iter1 = 60) #c("lp__", "phi[1]", "lambda[1]", "theta1[1]")
   print(p1)
   
