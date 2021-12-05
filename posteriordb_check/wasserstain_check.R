@@ -681,5 +681,78 @@ save(file = "../results/ELBO_pf.RData",
 round(apply(ELBO_pf, 2, median) - apply(ELBO_RVI_mf, 2, median), 2)
 
 
+## compute wasserstein distance for sensitivity test of L^max and tau^tol for the revision##
+load("../results/lp_posteriordb_phI_adapt_short_L_revise.RData")
+lp_opath_short_L_revise <- lp_opath
+M = 100
+W_d_100_pf_short_L_revise <- array(data = NA, dim = c(M, length(model_record)))
+
+t_0 <- proc.time()
+for(i in 1:49){ #length(model_record)
+  modelname <- pn[model_record[i]]
+  printf("model %d: %s", model_record[i], modelname)
+  
+  # pick model
+  po <- posterior(modelname, pdb = pd)
+  # get reference posterior samples
+  gsd <- reference_posterior_draws(po)
+  
+  # compile the model
+  sc <- stan_code(po)
+  model <- stan_model(model_code = sc)
+  
+  ###  get the data  ###
+  data <- get_data(po)
+  
+  ### get reference samples ###
+  posterior <- to_posterior(model, data)
+  D <- get_num_upars(posterior)
+  if(modelname == "eight_schools-eight_schools_noncentered"){
+    constrained_draws <- modify_8school_noncen(po)
+    unconstrained_draws <-  lapply(constrained_draws, unconstrain_draws, posterior)
+  } else if (modelname == "gp_pois_regr-gp_pois_regr") {
+    constrained_draws <- modify_draws_gp_pois_regr(po)
+    unconstrained_draws <-  lapply(constrained_draws, unconstrain_draws, posterior)
+  } else {
+    unconstrained_draws <-  lapply(gsd, unconstrain_draws, posterior)
+  }
+  
+  ref_samples = rbind(unconstrained_draws[[1]], unconstrained_draws[[2]], 
+                      unconstrained_draws[[3]], unconstrained_draws[[4]],
+                      unconstrained_draws[[5]], unconstrained_draws[[6]],
+                      unconstrained_draws[[7]], unconstrained_draws[[8]],
+                      unconstrained_draws[[9]], unconstrained_draws[[10]])
+  
+  b = wpp(ref_samples, mass = rep(1 / nrow(ref_samples), nrow(ref_samples)))
+  
+  for(j in 1:M){
+    cat(j, "\t")
+    ### samples from pathfinder ###
+    # _short_L
+    if(lp_opath_short_L_revise[[i]]$opath[[j]]$status == "mode"){ # no approximating Normal
+      pick_samples <- matrix(lp_opath_short_L_revise[[i]]$opath[[j]]$y[
+        nrow(lp_opath_short_L_revise[[i]]$opath[[j]]$y), 
+        -ncol(lp_opath_short_L_revise[[i]]$opath[[j]]$y)], ncol = 1)
+    } else {
+      pick_samples <- extract_samples(lp_opath_short_L_revise[[i]]$opath[[j]])
+    }
+    if(ncol(pick_samples) == 1){
+      a = wpp(rbind(t(pick_samples), t(pick_samples)), 
+              mass = rep(1 / 2, 2))
+    }else{
+      a = wpp(t(pick_samples), 
+              mass = rep(1 / ncol(pick_samples), ncol(pick_samples)))
+    }
+    w_d_pf1 <- wasserstein(a, b, p = 1); w_d_pf1
+    
+    W_d_100_pf_short_L_revise[j, i] = w_d_pf1
+    
+    cat("pf_short_L:", w_d_pf1, "\n")
+  }
+}
+proc.time() - t_0
+
+save(file = "../results/wasserstein_100_sen_W1_L_revise.RData",
+     list = c("W_d_100_pf_short_L_revise"))
 
 
