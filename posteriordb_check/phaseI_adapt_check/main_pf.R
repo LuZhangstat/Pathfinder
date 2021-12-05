@@ -12,7 +12,7 @@ library(posterior)
 source("../utils/sim_pf.R")
 source("../utils/lp_utils.R")
 
-pd <- pdb_local() # Posterior database connection
+pd <- pdb_local("./") # Posterior database connection
 pn <- posterior_names(pd)
 L_pn = length(pn)
 
@@ -34,8 +34,8 @@ seed_list = 1:MC
 # shorter optimization path #
 sen_test_L <- FALSE
 if(sen_test_L){
-  N1 = 200    # maximum iters in optimization
-  factr_tol = 1e7 # relative tolerance = 1-4 is not enough, should use at least 1e7
+  N1 = 100    # maximum iters in optimization
+  factr_tol = 1e12 # relative tolerance = 1-4 is not enough, should use at least 1e7
 }
 
 # larger sample size for ELBO evaluation #
@@ -59,7 +59,7 @@ lp_opath <- c()
 
 which(model_record == 48)
 t_0 <- proc.time()
-for(i in 1:49){ #length(model_record)
+for(i in 1:length(model_record)){ #length(model_record)
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
   
@@ -81,7 +81,7 @@ for(i in 1:49){ #length(model_record)
   cat("No. pars:", D," lmm in L-BFGS: ", lmm, "\n")
   
   t <- proc.time()
-  opath <- opt_path_stan_parallel(seed_list, seed_list, mc.cores, model, data,
+  opath <- opt_path_stan_parallel(seed_list, seed_list, mc.cores = 1, model, data,
                                   init_bound = init_bound, N1, N_sam_DIV, N_sam, 
                                   factr_tol, lmm, eval_lp_draws = FALSE) # plot for 8school init_bound = 15
   print(proc.time() - t)
@@ -102,12 +102,13 @@ for(i in 1:49){ #length(model_record)
 proc.time() - t_0
 
 
-# save(file = "../results/lp_posteriordb_phI_adapt_long_hist.RData",
+# save(file = "../results/lp_posteriordb_phI_adapt_short_L_revise.RData",
 #    list = c("lp_opath"))
 # _default
 # _short_L
 # _large_K
 # _long_hist
+# _short_L_revise
 
 lapply(lp_opath, f <- function(x){ncol(x$pick_samples)})
 
