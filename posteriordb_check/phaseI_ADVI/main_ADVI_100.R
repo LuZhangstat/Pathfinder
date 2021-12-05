@@ -44,6 +44,7 @@ ELBO_ADVI_mf = array(data = NA, dim = c(M, length(model_record)))
 iter_ADVI_mf = array(data = NA, dim = c(M, length(model_record)))
 
 ## check meanfield ##
+t_0 <- proc.time()
 for(i in 1:length(model_record)){
   modelname <- pn[model_record[i]]
   printf("model %d: %s", model_record[i], modelname)
@@ -74,6 +75,7 @@ for(i in 1:length(model_record)){
   file <- file.path(getwd(), "modelcode", paste0(modelname, ".stan"))
   mod <- cmdstan_model(file)
   
+  t <- proc.time()
   ## 100 ADVI meanfield ##
   ADVI_meanfield_center[[i]] <- array(data = NA, dim = c(D, M))
   ADVI_meanfield_draw[[i]] <- array(data = NA, dim = c(D, M))
@@ -164,7 +166,10 @@ for(i in 1:length(model_record)){
     }
     seed = seed + 1
   }
+  print(proc.time() - t)
 }
+proc.time() - t_0
+
 
 ## check fullrank ##
 ADVI_fullrank_draw <- list() 
@@ -201,7 +206,8 @@ for(i in 1:length(model_record)){
   file <- file.path(getwd(), "modelcode", paste0(modelname, ".stan"))
   mod <- cmdstan_model(file)
   
-  ## 100 ADVI meanfield ##
+  t <- proc.time()
+  ## 100 ADVI fullrank ##
   ADVI_fullrank_draw[[i]] <- array(data = NA, dim = c(D, M))
   ADVI_fullrank_draw_100[[i]] <- list()
   ADVI_fullrank_lrs_100[[i]] <- list()
@@ -292,6 +298,7 @@ for(i in 1:length(model_record)){
     }
     seed = seed + 1
   }
+  print(proc.time() - t)
 }
 
 save(file = "../results/ADVI_100_updat.RData",
