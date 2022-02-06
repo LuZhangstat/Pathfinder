@@ -1,5 +1,5 @@
 functions {
-#include gpbasisfun_functions.stan
+#include gpbasisfun_functions_rstan.stan
 }
 data {
   int<lower=1> N;      // number of observations
