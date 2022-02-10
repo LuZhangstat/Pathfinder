@@ -108,7 +108,7 @@ if(fit_stan_flag){
   
   fit6 <- model6$sample(data=standata6,
                         chains=4, parallel_chains=4,
-                        init=function() { init3 },
+                        init=function() { init6 },
                         seed = 1948458383,
                         adapt_delta = 0.9,
                         thin = 100,
@@ -567,5 +567,14 @@ ggsave("birth_pred_compar_pf_phI.eps", #"8-school_opt_tr22.eps"
        path = "./Birthdays/",
        width = 4.0, height = 4.0, units = "in")
 
+
+mean(PhI_leapfrog_counts)
+# 13488.05
+mean(pf_gr_calls)
+# 1286.9
+mean(pf_fn_calls)
+# 6386.75
+mean(PhI_leapfrog_counts) / mean(pf_gr_calls + (pf_fn_calls - pf_gr_calls  + 100)/4)
+# 5.2
 
 
