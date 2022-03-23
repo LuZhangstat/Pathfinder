@@ -219,7 +219,7 @@ for(iter_trun in 3:Iter){
 }
 
 p_comb <- grid.arrange(plot_list[[2]], plot_list[[3]], plot_list[[4]], 
-                       plot_list[[5]], plot_list[[7]], plot_list[[12]],
+                       plot_list[[5]], plot_list[[8]], plot_list[[12]],
                        ncol = 3, nrow = 2)
 
 ggsave(paste0("funnel_example.png"), #"8-school_opt_tr22.eps"

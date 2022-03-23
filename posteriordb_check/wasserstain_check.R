@@ -16,7 +16,7 @@ load("../results/ADVI_100_updat.RData")
 load("../results/multi_pf_samples_default.RData")
 
 
-pd <- pdb_local() # Posterior database connection
+pd <- pdb_local("./") # Posterior database connection
 pn <- posterior_names(pd)
 
 # old test #

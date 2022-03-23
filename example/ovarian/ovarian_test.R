@@ -18,7 +18,7 @@ set.seed(123)
 
 ### generate reference posterior samples ###
 
-pd <- pdb_local() # Posterior database connection
+pd <- pdb_local(".") # Posterior database connection
 pn <- posterior_names(pd)
 
 modelname <- pn[62]
@@ -51,7 +51,7 @@ if(fit_stan_flag){
                                sig_figs = 16)
   
   fit_stan$print("lp__")
-  fit_stan$save_object(file = "../example/overian/overian_ref.RDS")
+  fit_stan$save_object(file = "../example/ovarian/overian_ref.RDS")
   p1 <- mcmc_trace(fit_stan$draws("lp__"), iter1 = 1) #c("lp__", "phi[1]", "lambda[1]", "theta1[1]")
   print(p1)
   
@@ -67,10 +67,10 @@ if(fit_stan_flag){
   
   lp_INV <- quantile(Stan_draws[, "lp__"], c(0.005, 0.995))
   
-  save(file = "../example/overian/reference_overian.RData",
+  save(file = "../example/ovarian/reference_overian.RData",
        list = c("unconstrained_draws", "lp_INV"))
 }else{
-  load("../example/overian/reference_overian.RData")
+  load("../example/ovarian/reference_overian.RData")
 }
 
 ## Pathfinder ##
@@ -99,10 +99,10 @@ if(fit_pf_flag){
   pick_samples <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
   pf_fn_calls <- sapply(opath, f <- function(x){x$fn_call})
   pf_gr_calls <- sapply(opath, f <- function(x){x$gr_call})
-  save(file = "../example/overian/opath.RData",
+  save(file = "../example/ovarian/opath.RData",
        list = c("opath", "pick_samples", "pf_fn_calls", "pf_gr_calls"))
 }else{
-  load("../example/overian/opath.RData")
+  load("../example/ovarian/opath.RData")
 }
 
 ## pathfinder with initials from reference samples##
@@ -132,7 +132,7 @@ if(fit_pf_init_flag){
   pick_samples <- Imp_Resam_WR(opath, n_sam = 100, seed = 1)
   pf_fn_calls <- sapply(opath, f <- function(x){x$fn_call})
   pf_gr_calls <- sapply(opath, f <- function(x){x$gr_call})
-  save(file = "../example/overian/opath_init.RData",
+  save(file = "../example/ovarian/opath_init.RData",
        list = c("opath", "pick_samples", "pf_fn_calls", "pf_gr_calls"))
 }
 
@@ -145,8 +145,12 @@ check_dim <- c(1631, 2655) #93, 1117, 1491
 check_dim <- c(1631, 3029) 
 check_dim <- c(1, 1492)
 check_dim <- c(530, 2068)
+check_dim <- c(1, 3075)
+#check_dim <- c(3075, 1537)
+pick_samples = (opath[[15]]$DIV_save$repeat_draws)
+path_samples = (opath[[15]]$y)
 for(first_check in 1:10){
-  check_dim <- c(2 * first_check - 1, 2 * first_check)
+  check_dim <- c(2 * first_check - 1, 2 * first_check) + 1630
   
   plot(unconstrained_draws[, check_dim[1]], unconstrained_draws[, check_dim[2]], 
        col = "grey", 
@@ -161,7 +165,20 @@ for(first_check in 1:10){
   points(x = pick_samples[check_dim[1], ], y = pick_samples[check_dim[2], ], 
          col = "orange", pch = 16)
   
-  readline(prompt="Press [enter] to continue:")
+  # points(x = path_samples[100:nrow(path_samples), check_dim[1]], 
+  #        y = path_samples[100:nrow(path_samples), check_dim[2]], 
+  #        col = "yellow", pch = 17)
+  points(x = path_samples[, check_dim[1]],
+         y = path_samples[, check_dim[2]],
+         col = "yellow", pch = 17)
+  # text(x = path_samples[, check_dim[1]], y = path_samples[, check_dim[2]],
+  #      labels=1:nrow(path_samples), cex=0.9, font=2)
+  user_inp = readline(prompt="Press [enter] to continue or enter q to quit: ")
+  if (user_inp == "q") {
+    break
+  } else if (user_inp == "browse") {
+    browser()
+  }
 }
 
 
@@ -198,7 +215,7 @@ dta_opt$tr_id = factor(dta_opt$tr_id)
 # ggsave("overian_1_2.eps", #"8-school_opt_tr22.eps"
 #        plot = p_check,
 #        device = cairo_ps,
-#        path = "../example/overian/",
+#        path = "../example/ovarian/",
 #        width = 5.0, height = 5.0, units = "in")
 
 p_check1 <- ggplot(dta_check, aes(x=x, y=y) ) +
@@ -223,7 +240,7 @@ p_check1
 ggsave("overian_1_2_tr.eps", #_init 
        plot = p_check1,
        device = cairo_ps,
-       path = "../example/overian/",
+       path = "../example/ovarian/",
        width = 5.0, height = 5.0, units = "in")
 
 
@@ -243,7 +260,7 @@ points(x = pick_samples[check_dim[1], ], y = pick_samples[check_dim[2], ],
 
 ## check the prediction ##
 # expectation based on reference samples #
-fit_stan <- readRDS("../example/overian/overian_ref.RDS")
+fit_stan <- readRDS("../example/ovarian/overian_ref.RDS")
 draws <- fit_stan$draws()
 Sum_lh<- 
   summarise_draws(exp(subset(draws, variable = "log_lik", regex=TRUE)), "mean")
@@ -253,10 +270,10 @@ Sum_f<-
 
 # expectation based on Pathfinder approximate draws #
 constrained_sams <- 
-  apply(pick_samples, 2, f <- function(x){constrain_pars(posterior, x)$log_lik})
+  apply(pick_samples2, 2, f <- function(x){constrain_pars(posterior, x)$log_lik})
 Est_lh <- rowMeans(exp(constrained_sams))
 f_sams_pf <- 
-  apply(pick_samples, 2, f <- function(x){constrain_pars(posterior, x)$f})
+  apply(pick_samples2, 2, f <- function(x){constrain_pars(posterior, x)$f})
 Est_f <- rowMeans(plogis(f_sams_pf))
 
 
@@ -278,7 +295,7 @@ p_compar
 ggsave("overian_pred_compar.eps",  #_init
        plot = p_compar,
        device = cairo_ps,
-       path = "../example/overian/",
+       path = "../example/ovarian/",
        width = 4.0, height = 4.0, units = "in")
 
 
@@ -307,7 +324,7 @@ ggsave("overian_pred_compar.eps",  #_init
 
 library("scatterplot3d")
 #setEPS()
-png(filename = "../example/overian/ovarian_mode.png", width = 600, 
+png(filename = "../example/ovarian/ovarian_mode.png", width = 600, 
     height = 400)
 stp3 <- scatterplot3d(unconstrained_draws[, c(1631, 2655, 3029)], 
                       cex.symbols = 0.05, xlab = "", #bquote(lambda[93]), 
@@ -328,8 +345,10 @@ stp3 <- scatterplot3d(unconstrained_draws[, c(1631, 3021, 3029)],
 
 stp3$points3d(t(pick_samples[c(1631, 2655, 3029), ]), col = "red", pch = 16)
 check_dims <- c(1, 1631, 1538) #c(1631, 3021, 3029) #
-par(mfrow=c(2,2))
-for(ind in 1:20){
+check_dims <- c(1631, 2655, 3029)
+check_dims <- c(1, 3075, 1537)
+par(mfrow=c(1,2))
+for(ind in c(1:20)){
   est_ELBO = round(mean(-opath[[ind]]$DIV_save$fn_draws -
                           opath[[ind]]$DIV_save$lp_approx_draws), digits = 2)
   cat(ind, "\t", opath[[ind]]$DIV_save$DIV, "\t",
@@ -355,13 +374,23 @@ for(ind in 1:20){
   stp3$points3d(t(opath[[ind]]$y[1, check_dims]), col = "yellow", pch = 16)
   stp3$points3d(t(opath[[ind]]$y[nrow(opath[[ind]]$y), check_dims]),
                 col = "blue", pch = 16)
-  readline(prompt="Press [enter] to continue:")
+  user_inp = readline(prompt="Press [enter] to continue or enter q to quit: ")
+  if (user_inp == "q") {
+    break
+  } else if (user_inp == "browse") {
+    browser()
+  }
   f_sams_pf <- 
     apply(pick_samples, 2, f <- function(x){constrain_pars(posterior, x)$f})
   Est_f <- rowMeans(plogis(f_sams_pf))
   plot(Sum_f$mean, Est_f, xlab = "HMC", xlim = c(0, 1), ylim = c(0, 1),
        ylab = "Pathfinder", main = paste0("est ELBO:", est_ELBO))
   abline(a = 0, b = 1)
-  readline(prompt="Press [enter] to continue:")
+  user_inp = readline(prompt="Press [enter] to continue or enter q to quit: ")
+  if (user_inp == "q") {
+    break
+  } else if (user_inp == "browse") {
+    browser()
+  }
 }
 

@@ -134,7 +134,7 @@ for (iter in 1:Iter){
   ill_distr = FALSE
   tryCatch(
     # generate matrics for forming approximted inverse Hessian
-    sample_pkg[[iter]] <- Form_N_apx(X[iter + 1, ], G[iter + 1, ], Ykt_h, Skt_h, E, lmm),
+    sample_pkg[[iter]] <- Form_N_apx(X[iter + 1, ], Ykt_h, Skt_h, E, lmm),
     error = function(e) { ill_distr <<- TRUE})
   if(ill_distr){ next }
   if(is.na(sample_pkg[1])){ next }
