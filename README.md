@@ -43,7 +43,7 @@ Authors
 ---------
 | Name   | Email       |              |
 |:------ |:----------- | :----------- |
-| Lu Zhang | lz2786@columbia.edu        | Ph.D.  Columbia Univeristy, Statistics |
+| Lu Zhang | lzhang63@usc.edu        | Ph.D.  University of Southern California, PPHS, Biostatistics |
 | Bob Carpenter | bcarpenter@flatironinstitute.org       | Ph.D. Flatiron Institute |
 
 
